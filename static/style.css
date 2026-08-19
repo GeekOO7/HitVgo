@@ -129,6 +129,14 @@ body.admin-body {
   white-space: nowrap;
 }
 
+.topbar-author {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  text-decoration: none;
+  opacity: 0.55;
+}
+.topbar-author:hover { opacity: 0.85; }
+
 .draft-status {
   font-size: 0.78rem;
   white-space: nowrap;
@@ -3686,6 +3694,9 @@ body.modal-open {
 @media (max-width: 560px) {
   .topbar-brand h1 {
     font-size: 0.9rem;
+  }
+  .topbar-author {
+    display: none;
   }
 }
 

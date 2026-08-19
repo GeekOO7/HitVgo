@@ -1,5 +1,7 @@
 # HitVgo 本机助手（Local Agent）
 
+> 作者：**Geek007** · 仓库：[GeekOO7/HitVgo](https://github.com/GeekOO7/HitVgo)
+
 在用户电脑上运行，由网页把自定义 RunningHub / ComfyUI / LLM 任务交给本助手执行，**避免浏览器跨域**。
 
 ## 快速开始（Windows）

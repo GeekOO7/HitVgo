@@ -1,5 +1,6 @@
 {
   "brand.name": "HitVgo · 影高",
+  "brand.author": "Geek007 · 影高作者",
   "app.title": "HitVgo · 影高 — AI 视频创作平台",
   "page.title": "HitVgo · 影高 — AI 视频创作平台",
   "auth.title": "HitVgo · 影高 — AI 视频创作平台",
@@ -1206,5 +1207,9 @@
   "admin.siteSaved": "本站配置已保存",
   "admin.siteConfirmReset": "将当前表单恢复为内置默认文案？不会自动保存，需再点「保存配置」。",
   "admin.siteDefaultsLoaded": "已载入默认文案（尚未保存）",
-  "admin.siteDefaultsMissing": "无法获取默认配置"
+  "admin.siteDefaultsMissing": "无法获取默认配置",
+  "about.title": "关于 HitVgo · 影高",
+  "about.desc": "本机 AI 视频创作界面，对接你自己的 RunningHub / ComfyUI 工作流，LLM 自动绑定参数，分镜写词、批量生成与时间轴剪接。所有 Key 留在本机。",
+  "about.author": "作者：Geek007",
+  "about.site": "官方站点"
 }

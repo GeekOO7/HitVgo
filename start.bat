@@ -16,6 +16,7 @@ if not exist "app.py" (
 )
 
 echo Starting HitVgo...
+echo Author: Geek007  https://hitvgo.geek007.com
 echo URL: http://127.0.0.1:5000
 echo Close this window or run stop.bat to stop.
 echo.

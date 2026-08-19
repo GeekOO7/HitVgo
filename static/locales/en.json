@@ -1,5 +1,6 @@
 {
   "brand.name": "HitVgo",
+  "brand.author": "by Geek007",
   "app.title": "HitVgo — AI Video Creation Platform",
   "page.title": "HitVgo — AI Video Creation Platform",
   "auth.title": "HitVgo — AI Video Creation Platform",
@@ -1206,5 +1207,9 @@
   "admin.siteSaved": "Site settings saved",
   "admin.siteConfirmReset": "Reset the form to built-in defaults? This does not save until you click Save settings.",
   "admin.siteDefaultsLoaded": "Defaults loaded (not saved yet)",
-  "admin.siteDefaultsMissing": "Could not load defaults"
+  "admin.siteDefaultsMissing": "Could not load defaults",
+  "about.title": "About HitVgo",
+  "about.desc": "A local AI video creation UI — connect your own RunningHub / ComfyUI workflows, auto-bind parameters with LLM, write storyboards, batch-generate clips, and edit on a timeline. All keys stay on your machine.",
+  "about.author": "Author: Geek007",
+  "about.site": "Official site"
 }
