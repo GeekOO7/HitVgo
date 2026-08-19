@@ -1,0 +1,17 @@
+{
+  "wan": {
+    "i2v": "",
+    "flf": "",
+    "i2vDuck": "",
+    "flfDuck": "",
+    "i2vBindings": {},
+    "flfBindings": {}
+  },
+  "minimax": {
+    "ref2va": "",
+    "flf": "",
+    "ref2vaBindings": {},
+    "flfBindings": {}
+  },
+  "editors": []
+}
