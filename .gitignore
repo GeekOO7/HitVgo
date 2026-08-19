@@ -1,0 +1,34 @@
+# Secrets — never commit
+key.txt
+llm_key.txt
+session_secret.txt
+.env
+platform_workflows.json
+editors.json
+
+# Runtime data
+decoded/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.lock
+
+# Python / venv
+__pycache__/
+*.pyc
+.venv/
+venv/
+local_agent/.venv/
+
+# Local ComfyUI workflow dumps (not part of the public tree)
+wf/
+LTX*.json
+
+# Local scratch
+_patch_appjs_*.py
+/_*.txt
+/_*.py
+/_*.js
+/_v_*.json
+*.log

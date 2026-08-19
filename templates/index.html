@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="{{ 'en' if site_locale == 'en' else 'zh-CN' }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="page.title">{{ site_seo.title or site_ui.pageTitle or 'HitVgo · 影高 — AI 视频创作平台' }}</title>
+  <meta name="description" content="{{ site_seo.description or '' }}" />
+  <meta name="keywords" content="{{ site_seo.keywords or '' }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="{{ site_seo.ogTitle or site_seo.title or '' }}" />
+  <meta property="og:description" content="{{ site_seo.ogDescription or site_seo.description or '' }}" />
+  {% if site_seo.ogImage %}
+  <meta property="og:image" content="{{ site_seo.ogImage }}" />
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ site_seo.ogTitle or site_seo.title or '' }}" />
+  <meta name="twitter:description" content="{{ site_seo.ogDescription or site_seo.description or '' }}" />
+  {% if site_seo.ogImage %}
+  <meta name="twitter:image" content="{{ site_seo.ogImage }}" />
+  {% endif %}
+  <link rel="stylesheet" href="/static/style.css?v=polish-scope-1" />
+</head>
+<body>
+  <div class="editor-shell" id="editorShell" data-phase="1">
+    <header class="editor-topbar">
+      <div class="topbar-brand">
+        <h1 data-brand>{{ site_ui.brandName or 'HitVgo · 影高' }}</h1>
+        <span id="draftStatus" class="draft-status muted" aria-live="polite"></span>
+      </div>
+      <nav class="phase-steps" data-i18n-aria-label="phase.ariaLabel" aria-label="工作阶段">
+        <button type="button" class="phase-step active" data-step="1" data-i18n="phase.step1">1 主段生成</button>
+        <span class="phase-step-sep" aria-hidden="true">→</span>
+        <button type="button" class="phase-step" data-step="2" data-i18n="phase.step2">2 桥接缝合</button>
+        <span class="phase-step-sep" aria-hidden="true">→</span>
+        <button type="button" class="phase-step" data-step="3" data-i18n="phase.step3">3 整合预览</button>
+      </nav>
+      <p class="topbar-meta muted">
+        <span id="channelSummary" class="channel-summary" data-i18n-title="topbar.channelSummaryTitle" title="当前 API 渠道">本机图生视频 · 本机语言模型</span>
+      </p>
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button type="button" class="btn btn-ghost btn-sm lang-btn" data-set-locale="zh" id="btnLocaleZh">中文</button>
+        <button type="button" class="btn btn-ghost btn-sm lang-btn" data-set-locale="en" id="btnLocaleEn">EN</button>
+      </div>
+      <button type="button" id="btnOpenSettings" class="btn btn-ghost btn-sm" data-i18n="topbar.settings" data-i18n-title="topbar.settingsTitle" title="工作流、语言模型、本机助手与公共设置">设置</button>
+      <div class="topbar-dropdown" id="jobsDropdown">
+        <button type="button" class="btn btn-ghost btn-sm topbar-dropdown-toggle" id="btnJobsToggle" aria-expanded="false" aria-haspopup="true">
+          <span data-i18n="topbar.myJobs">生成队列</span> <span id="jobsBadge" class="jobs-badge hidden">0</span> ▾
+        </button>
+        <div class="topbar-dropdown-panel jobs-dropdown-panel hidden" id="jobsDropdownPanel" role="menu">
+          <p class="sidebar-note muted" id="jobsPanelHint" data-i18n="topbar.jobsPanelHint">
+            显示你的生成队列。强制结束只解除本站占用，远端可能仍在跑。
+          </p>
+          <div class="row gap jobs-panel-actions">
+            <button type="button" id="btnJobsRefresh" class="btn btn-ghost btn-sm" data-i18n="topbar.jobsRefresh">刷新</button>
+            <button type="button" id="btnJobsStopWaiting" class="btn btn-ghost btn-sm" data-i18n="topbar.jobsStopWaiting">停止排队</button>
+            <button type="button" id="btnJobsClearFinished" class="btn btn-ghost btn-sm" data-i18n="topbar.jobsClearFinished">清空已完成</button>
+            <button type="button" id="btnJobsForceAll" class="btn btn-danger btn-sm" data-i18n="topbar.jobsForceAll">强制结束全部</button>
+          </div>
+          <ul id="jobsList" class="jobs-list"></ul>
+          <p id="jobsEmpty" class="empty-hint muted" data-i18n="topbar.jobsEmpty">暂无任务</p>
+        </div>
+      </div>
+      <div class="topbar-dropdown" id="presetDropdown">
+        <button type="button" class="btn btn-ghost btn-sm topbar-dropdown-toggle" id="btnPresetToggle" aria-expanded="false" aria-haspopup="true">
+          <span data-i18n="topbar.myProjects">项目</span> ▾
+        </button>
+        <div class="topbar-dropdown-panel hidden" id="presetDropdownPanel" role="menu">
+          <p class="sidebar-note muted" data-i18n="topbar.projectsHint">项目保存配置、时间轴与槽位素材；加载会切换当前工作区</p>
+          <div class="preset-save-row">
+            <div class="row gap">
+              <button type="button" id="btnSavePreset" class="btn btn-primary btn-sm" data-i18n="topbar.saveCurrent">保存当前</button>
+              <button type="button" id="btnNewProject" class="btn btn-ghost btn-sm" data-i18n="topbar.newProject">新建项目</button>
+            </div>
+          </div>
+          <ul id="presetList" class="preset-list"></ul>
+          <p id="presetEmpty" class="empty-hint muted" data-i18n="topbar.projectsEmpty">暂无项目</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="editor-workspace">
+      <aside class="media-bin" id="mediaBin">
+        <section class="bin-section" id="imagePanel">
+          <h2 class="bin-title" data-i18n="bins.sharedStart">共用首帧</h2>
+          <div class="row bin-actions">
+            <label class="file-btn">
+              <span data-i18n="bins.chooseImage">选择图片</span>
+              <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp,image/jpg" hidden />
+            </label>
+            <button type="button" id="btnPickSharedFromLibrary" class="btn btn-ghost btn-sm" data-i18n="bins.pickFromLibrary">从素材库选用</button>
+            <button type="button" id="btnGoFirstFrameGen" class="btn btn-ghost btn-sm" data-i18n="bins.goGenerate">去生成</button>
+          </div>
+          <span id="imageName" class="muted bin-filename" data-i18n="bins.notSelected">未选择</span>
+          <div id="dropZone" class="drop-zone">
+            <p class="drop-hint muted" data-i18n="bins.dropHint">拖入首帧图</p>
+            <div id="imagePreviewWrap" class="preview-wrap hidden">
+              <img id="imagePreview" alt="preview" />
+            </div>
+          </div>
+          <div id="startCompact" class="start-compact hidden">
+            <img id="startCompactThumb" alt="" />
+            <div class="start-compact-meta">
+              <span id="startCompactName" class="muted"></span>
+              <button type="button" id="btnReplaceStart" class="btn btn-ghost btn-sm" data-i18n="bins.replace">更换</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="bin-section media-bin-workflow-slots hidden" id="mediaBinWorkflowSlots">
+          <h2 class="bin-title" data-i18n="bins.workflowInputs">工作流输入</h2>
+          <div id="mediaBinWorkflowSlotList" class="workflow-slot-list"></div>
+        </section>
+
+        <section class="bin-section media-bin-multiref hidden" id="mediaBinMultiRefPanel">
+          <h2 class="bin-title" data-i18n="bins.refAssets">参考素材</h2>
+          <label class="inline checkbox-inline">
+            <input type="checkbox" id="mediaBinUseMultiRef" />
+            <span data-i18n="storyboard.useMultiRef">使用多参考素材</span>
+          </label>
+          <div id="mediaBinRefList" class="storyboard-ref-list"></div>
+          <div class="row gap">
+            <button type="button" id="btnAddMediaBinRefImage" class="btn btn-ghost btn-sm" data-i18n="storyboard.addRefImage">添加参考图</button>
+            <button type="button" id="btnAddMediaBinRefVideo" class="btn btn-ghost btn-sm hidden" data-i18n="storyboard.addRefVideo">添加参考视频</button>
+            <button type="button" id="btnAddMediaBinRefAudio" class="btn btn-ghost btn-sm hidden" data-i18n="storyboard.addRefAudio">添加参考音频</button>
+            <input type="file" id="mediaBinRefFileInput" class="hidden" accept="image/*,video/*,audio/*" />
+          </div>
+        </section>
+
+        <section class="bin-section edit-frame-panel hidden" id="editFramePanel">
+          <h2 class="bin-title" id="editFramePanelTitle" data-i18n="bins.editFrameTitle">编辑槽首帧</h2>
+          <div class="edit-frame-preview" id="editFramePreview">
+            <span class="muted" data-i18n="bins.editFrameEmpty">暂无画面</span>
+          </div>
+          <span class="muted edit-frame-meta" id="editFrameMeta"></span>
+        </section>
+
+        <section class="bin-section flf-frame-panel hidden" id="flfFramePanel">
+          <h2 class="bin-title" id="flfFramePanelTitle" data-i18n="bins.flfTitle">桥接首尾帧（FLF）</h2>
+          <p id="flfStaleBanner" class="flf-stale-banner hidden" data-i18n="bins.flfStaleBanner">
+            桥已变化，衔接未生成 · 点「生成桥接」重新衔接
+          </p>
+          <div class="flf-frame-cols">
+            <div class="flf-frame-col" data-side="start">
+              <div class="flf-frame-label" data-i18n="bins.flfStartLabel">前段出点 · FLF 首帧</div>
+              <div class="flf-frame-preview" id="flfStartPreview">
+                <span class="muted" data-i18n="bins.flfNotClipped">未节选</span>
+              </div>
+              <span class="muted flf-frame-meta" id="flfStartMeta"></span>
+              <div class="flf-frame-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="btnFlfPickStart" data-i18n="bins.flfPickFromVideo">从视频节选</button>
+                <label class="file-btn btn-sm">
+                  <span data-i18n="bins.flfUploadImage">上传图片</span>
+                  <input type="file" id="flfStartUpload" accept="image/jpeg,image/png,image/webp,image/jpg" hidden />
+                </label>
+                <button type="button" class="btn btn-ghost btn-sm" id="btnFlfLibStart" data-i18n="bins.pickFromLibrary">从素材库选用</button>
+              </div>
+            </div>
+            <div class="flf-frame-arrow" aria-hidden="true">→</div>
+            <div class="flf-frame-col" data-side="end">
+              <div class="flf-frame-label" data-i18n="bins.flfEndLabel">后段入点 · FLF 尾帧</div>
+              <div class="flf-frame-preview" id="flfEndPreview">
+                <span class="muted" data-i18n="bins.flfNotClipped">未节选</span>
+              </div>
+              <span class="muted flf-frame-meta" id="flfEndMeta"></span>
+              <div class="flf-frame-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="btnFlfPickEnd" data-i18n="bins.flfPickFromVideo">从视频节选</button>
+                <label class="file-btn btn-sm">
+                  <span data-i18n="bins.flfUploadImage">上传图片</span>
+                  <input type="file" id="flfEndUpload" accept="image/jpeg,image/png,image/webp,image/jpg" hidden />
+                </label>
+                <button type="button" class="btn btn-ghost btn-sm" id="btnFlfLibEnd" data-i18n="bins.pickFromLibrary">从素材库选用</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="bin-section" id="assetLibrarySection">
+          <div class="bin-title-row">
+            <h2 class="bin-title" data-i18n="bins.myAssets">我的素材</h2>
+            <div class="bin-title-actions">
+              <button
+                type="button"
+                id="btnImportAssets"
+                class="btn btn-ghost btn-sm"
+                data-i18n="bins.importAssets"
+                data-i18n-title="bins.importAssetsTitle"
+                title="导入本地图片或视频到当前项目"
+              >
+                导入
+              </button>
+              <input
+                type="file"
+                id="importAssetsInput"
+                class="hidden"
+                multiple
+                accept="image/*,video/*,audio/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp4,.webm,.mov,.mkv,.m4v,.mp3,.wav,.m4a,.flac,.ogg,.aac"
+              />
+              <button
+                type="button"
+                id="btnVideoThumbPreview"
+                class="bin-eye-toggle is-on"
+                aria-pressed="true"
+                data-i18n-aria-label="bins.videoThumbPreview"
+                data-i18n-title="bins.videoThumbPreviewTitle"
+                aria-label="首帧预览"
+                title="打开：视频缩略图显示第一帧；关闭：模糊化显示"
+              >
+                <svg class="bin-eye-on" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M12 5c-5 0-9.27 3.11-11 7.5C2.73 16.89 7 20 12 20s9.27-3.11 11-7.5C21.27 8.11 17 5 12 5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                </svg>
+                <svg class="bin-eye-off" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M2.1 3.51 3.51 2.1l18.38 18.39-1.41 1.41-3.1-3.1A11.7 11.7 0 0 1 12 20c-5 0-9.27-3.11-11-7.5a12.4 12.4 0 0 1 4.05-5.05L2.1 3.51zM12 7a5 5 0 0 1 4.9 6.1l-1.55-1.55A3 3 0 0 0 12 9a3 3 0 0 0-2.55 1.35L7.9 8.8A4.96 4.96 0 0 1 12 7zm-7.66 5.5c.7-1.35 1.78-2.5 3.1-3.35l1.62 1.62A5 5 0 0 0 12 17a4.96 4.96 0 0 0 2.55-.7l1.5 1.5c-1.2.55-2.58.87-4.05.87-3.4 0-6.35-1.8-7.66-4.17z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div
+            id="assetOriginTabs"
+            class="asset-origin-tabs"
+            role="tablist"
+            data-i18n-aria-label="bins.assetOriginAria"
+            aria-label="素材来源"
+          >
+            <button type="button" class="asset-origin-tab is-active" role="tab" aria-selected="true" data-origin="local" data-i18n="bins.assetOriginLocal">本地</button>
+            <button type="button" class="asset-origin-tab" role="tab" aria-selected="false" data-origin="script" data-i18n="bins.assetOriginScript">剧本</button>
+          </div>
+          <div id="assetUsageBar" class="asset-usage-bar hidden" hidden>
+            <div class="asset-usage-track">
+              <div id="assetUsageFill" class="asset-usage-fill" style="width:0%"></div>
+            </div>
+            <div class="asset-usage-meta">
+              <span id="assetUsageText" class="muted">已用 — / 200 MB</span>
+              <span id="assetUsageHint" class="asset-usage-hint hidden" data-i18n="bins.assetUsageFull">空间不足，无法执行新任务</span>
+            </div>
+          </div>
+          <p id="assetLocalHint" class="muted asset-local-hint hidden" data-i18n="bins.assetLocalHint">本地素材存于本机，不占云端配额</p>
+          <p id="assetFramePickHint" class="asset-frame-pick-hint hidden" data-i18n="asset.pickFrameHint">请在下方点选一张图片作为当前帧</p>
+          <div id="assetFolderNav" class="asset-folder-nav hidden">
+            <button type="button" id="btnAssetFolderUp" class="btn btn-ghost btn-sm asset-folder-up">
+              <span id="assetFolderUpPrefix" class="asset-folder-up-prefix" data-i18n="bins.assetFolderUp">← 全部素材</span>
+              <span class="asset-folder-sep">·</span>
+              <span id="assetFolderLabel"></span>
+            </button>
+          </div>
+          <p class="muted empty-hint" id="assetLibraryEmpty" data-i18n="bins.assetLibraryEmpty">生成结果与上传帧会出现在这里</p>
+          <div id="assetLibraryList" class="media-clip-list"></div>
+        </section>
+      </aside>
+
+      <section class="preview-stage" id="playlistPanel">
+        <div class="preview-viewport">
+          <video id="playlistVideo" class="preview-video is-active" playsinline preload="auto"></video>
+          <video id="playlistVideoB" class="preview-video" playsinline preload="auto"></video>
+          <img id="playlistImage" class="playlist-image hidden" alt="" />
+          <div id="previewEmpty" class="preview-empty">
+            <p data-i18n="preview.title">中央预览</p>
+            <p class="muted" data-i18n="preview.hint">在底部时间轴点选片段</p>
+          </div>
+        </div>
+        <div id="assetBrowseBar" class="asset-browse-bar hidden">
+          <span id="assetBrowseHint" class="muted" data-i18n="bins.assetBrowseHint">素材库预览</span>
+          <div class="asset-browse-actions row gap">
+            <button type="button" id="btnSetSharedFromBrowse" class="btn btn-primary btn-sm hidden" data-i18n="firstFrame.setShared">设为共用首帧</button>
+            <button type="button" id="btnApplyAsset" class="btn btn-primary btn-sm" data-i18n="bins.applyToSlot">选用到当前槽</button>
+          </div>
+        </div>
+        <div id="firstFrameGenBar" class="first-frame-gen-bar">
+          <div class="first-frame-gen-head">
+            <strong data-i18n="firstFrame.genTitle">首帧生成</strong>
+            <span id="firstFrameSizeHint" class="muted first-frame-size-hint"></span>
+          </div>
+          <textarea
+            id="firstFramePrompt"
+            class="first-frame-prompt"
+            rows="3"
+            data-i18n-placeholder="firstFrame.promptPlaceholder"
+            placeholder="描述要生成的首帧画面…"
+          ></textarea>
+          <div class="first-frame-gen-actions row gap">
+            <button type="button" id="btnExpandFirstFramePrompt" class="btn btn-ghost btn-sm" data-i18n="firstFrame.expand">扩写润色</button>
+            <button type="button" id="btnGenerateFirstFrame" class="btn btn-primary btn-sm" data-i18n="firstFrame.generate">生成首帧</button>
+            <span id="firstFrameGenStatus" class="muted"></span>
+          </div>
+        </div>
+        <div class="transport">
+          <div class="transport-btns row gap">
+            <button type="button" id="btnPlaylistPlay" class="btn btn-primary" data-i18n="preview.play">▶ 播放当前</button>
+            <label class="transport-compose-toggle" data-i18n-title="preview.composeModeTitle" title="开启后按图层合成播放整条时间轴；关闭则只播当前选中槽">
+              <input type="checkbox" id="chkComposePlay" />
+              <span data-i18n="preview.composeMode">全局（图层）</span>
+            </label>
+            <button type="button" id="btnPlaylistPrev" class="btn btn-ghost" data-i18n="preview.prev">上一段</button>
+            <button type="button" id="btnPlaylistNext" class="btn btn-ghost" data-i18n="preview.next">下一段</button>
+            <button type="button" id="btnExportVideo" class="btn btn-ghost" data-i18n="preview.export" data-i18n-title="preview.exportTitle" title="按时间轴合成导出 WebM">导出视频</button>
+          </div>
+          <span id="playlistMeta" class="muted transport-meta"></span>
+        </div>
+      </section>
+
+      <aside class="inspector" id="inspector">
+        <section class="inspector-block clip-meta-bar" id="clipMetaBar">
+          <div class="clip-meta-head">
+            <h2 id="clipMetaTitle" data-i18n="inspector.noneSelected">未选中</h2>
+            <span id="clipMetaBadge" class="badge pending hidden"></span>
+          </div>
+          <p id="clipMetaHint" class="muted clip-meta-hint" data-i18n="inspector.selectHint">在时间轴点选一段以编辑提示词</p>
+          <p id="clipMetaSeed" class="muted clip-meta-seed hidden"></p>
+
+          <div class="vflow-params" id="vflowParams">
+            <div class="vflow-params-head">
+              <div class="vflow-params-label muted" data-i18n="inspector.workflowSize">生成尺寸（工作流）</div>
+              <button type="button" class="btn btn-ghost btn-sm" id="btnWfReset" data-i18n="inspector.resetDefault">恢复默认</button>
+            </div>
+            <div class="row gap orient-row" role="group" data-i18n-aria-label="inspector.orientAria" aria-label="横竖屏">
+              <button type="button" class="btn btn-sm orient-btn is-active" data-orient="landscape" id="btnOrientLandscape">横屏 {{ vflow_landscape_w }}×{{ vflow_landscape_h }}</button>
+              <button type="button" class="btn btn-sm orient-btn" data-orient="portrait" id="btnOrientPortrait">竖屏 {{ vflow_portrait_w }}×{{ vflow_portrait_h }}</button>
+            </div>
+            <div class="vflow-params-grid">
+              <label class="vflow-field">
+                <span class="muted" data-i18n="inspector.width">宽</span>
+                <input type="number" id="vflowWidth" min="256" max="1920" step="16" value="{{ vflow_width }}" />
+              </label>
+              <label class="vflow-field">
+                <span class="muted" data-i18n="inspector.height">高</span>
+                <input type="number" id="vflowHeight" min="256" max="1920" step="16" value="{{ vflow_height }}" />
+              </label>
+              <label class="vflow-field" id="vflowLengthField">
+                <span class="muted" data-i18n="inspector.frames">帧数</span>
+                <input type="number" id="vflowLength" min="17" max="2000" step="4" value="{{ vflow_length }}" />
+              </label>
+              <label class="vflow-field" id="vflowDurationField" hidden>
+                <span class="muted" data-i18n="inspector.durationSec">秒数</span>
+                <input type="number" id="vflowDurationSec" min="10" max="15" step="5" value="10" readonly tabindex="-1" />
+              </label>
+              <label class="vflow-field" id="vflowFpsField">
+                <span class="muted" data-i18n="inspector.fps">帧率</span>
+                <input type="number" id="vflowFps" min="8" max="30" step="1" value="{{ vflow_fps }}" />
+              </label>
+            </div>
+            <label class="vflow-timing-global inline" for="vflowTimingGlobal">
+              <input type="checkbox" id="vflowTimingGlobal" checked />
+              <span data-i18n="inspector.timingGlobal">全局绑定</span>
+            </label>
+            <div class="row gap length-presets" id="vflowLengthPresets" role="group" data-i18n-aria-label="inspector.lengthPresetsAria" aria-label="常用帧数">
+              <button type="button" class="btn btn-ghost btn-sm" data-vflow-length="49">短 49</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-vflow-length="81">中 81</button>
+              <button type="button" class="btn btn-ghost btn-sm is-active" data-vflow-length="{{ vflow_length }}">默认 {{ vflow_length }}</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-vflow-length="161">长 161</button>
+            </div>
+            <div class="row gap duration-presets" id="vflowDurationPresets" role="group" data-i18n-aria-label="inspector.durationPresetsAria" aria-label="生成秒数" hidden>
+              <button type="button" class="btn btn-ghost btn-sm is-active" data-vflow-duration="10">10s</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-vflow-duration="15">15s</button>
+            </div>
+            <p class="muted vflow-params-hint" id="vflowParamsHint" data-i18n="inspector.paramsHint">宽高建议 16 倍数；帧数建议 4n+1（如 49/81/113）。勾选全局绑定时，所有跟随全局的视频段按时长=帧数/帧率显示在时间轴。</p>
+          </div>
+        </section>
+
+        <section class="inspector-block" id="selectionEditor">
+          <div id="selectionPromptWrap">
+            <label class="field-label muted" for="selectedPrompt" id="selectedPromptLabel" data-i18n="inspector.promptLabel">本段提示词</label>
+            <textarea id="selectedPrompt" rows="5" data-i18n-placeholder="inspector.promptPlaceholder" placeholder="选中时间轴片段后编辑…" disabled></textarea>
+          </div>
+          <div id="workflowParamFields" class="editor-input-fields workflow-param-fields hidden"></div>
+          <div id="editorSlotPanel" class="editor-slot-panel hidden">
+            <div class="editor-slot-head">
+              <div class="editor-slot-label muted" id="editorSlotTitle" data-i18n="inspector.editorParams">编辑器参数</div>
+              <p class="muted editor-slot-desc" id="editorSlotDesc"></p>
+            </div>
+            <button type="button" id="btnOpenEditorParams" class="btn btn-ghost btn-sm" data-i18n="inspector.openEditorModal">配置并运行</button>
+            <div class="editor-input-fields hidden" id="editorSlotFields"></div>
+          </div>
+          <div class="row gap actions" id="selectionActions">
+            <label class="inline inspector-engine-row" id="inspectorEngineWrap">
+              <span class="muted" data-i18n="inspector.engine">引擎</span>
+              <select id="inspectorEngine" class="storyboard-engine-select"></select>
+            </label>
+            <button type="button" id="btnGenerateSelected" class="btn btn-primary" data-i18n="inspector.generate">开始生成</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <footer class="editor-timeline">
+      <div class="timeline-head">
+        <div class="timeline-label muted" data-i18n="timeline.label">多图层时间线</div>
+        <div class="tl-toolbar">
+          <button type="button" id="btnOpenStoryboard" class="btn btn-storyboard btn-sm" data-i18n="timeline.storyboardTool" data-i18n-title="timeline.storyboardTitle" title="打开剧情分镜工具">剧情分镜工具ai+</button>
+          <button type="button" id="btnTlZoomOut" class="btn btn-ghost btn-sm" data-i18n-title="timeline.zoomOut" title="缩小">−</button>
+          <button type="button" id="btnTlZoomIn" class="btn btn-ghost btn-sm" data-i18n-title="timeline.zoomIn" title="放大">＋</button>
+          <button type="button" id="btnTlFit" class="btn btn-ghost btn-sm" data-i18n="timeline.fit" data-i18n-title="timeline.fitTitle" title="适配宽度">适配</button>
+          <span id="tlZoomLabel" class="muted tl-zoom-label">40px/s</span>
+          <button type="button" id="btnTlAddVideoTrack" class="btn btn-ghost btn-sm" data-i18n="timeline.addVideoTrack" data-i18n-title="timeline.addVideoTrackTitle" title="新增视频层">＋视频层</button>
+          <button type="button" id="btnTlAddAudioTrack" class="btn btn-ghost btn-sm" data-i18n="timeline.addAudioTrack" data-i18n-title="timeline.addAudioTrackTitle" title="新增音轨层">＋音轨</button>
+        </div>
+        <span id="tlPlayheadTime" class="muted tl-playhead-time">0.00s</span>
+      </div>
+      <div class="tl-body" id="timelineBody">
+        <div class="tl-labels-col" id="timelineLabels"></div>
+        <div class="tl-scroll" id="timelineScroll">
+          <div class="tl-canvas" id="timelineCanvas">
+            <div class="tl-ruler" id="timelineRuler"></div>
+            <div class="tl-tracks" id="timelineTracks"></div>
+            <div class="tl-playhead" id="timelinePlayhead" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-backdrop" data-close-settings></div>
+    <div class="modal-card settings-modal-card">
+      <div class="modal-head">
+        <h3 id="settingsModalTitle" data-i18n="settings.title">设置</h3>
+        <div id="agentStatusBar" class="agent-status-bar hidden" title="">
+          <span class="agent-status-dot is-off" aria-hidden="true"></span>
+          <span class="agent-status-text" data-i18n="agent.statusOff">本机助手未连接</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-settings data-i18n="settings.close">关闭</button>
+      </div>
+      <div class="settings-tabs" role="tablist">
+        <button type="button" class="settings-tab active" data-settings-tab="workflows" role="tab" aria-selected="true" data-i18n="settings.tabWorkflows">工作流</button>
+        <button type="button" class="settings-tab" data-settings-tab="llm" role="tab" aria-selected="false" data-i18n="settings.tabLlm">语言模型</button>
+        <button type="button" class="settings-tab" data-settings-tab="agent" role="tab" aria-selected="false" data-i18n="settings.tabAgent">本机助手</button>
+        <button type="button" class="settings-tab" data-settings-tab="common" role="tab" aria-selected="false" data-i18n="settings.tabCommon">公共</button>
+      </div>
+      <div class="settings-modal-main">
+        <div class="settings-modal-body">
+        <section id="settingsTabWorkflows" class="settings-pane" data-pane="workflows">
+          <p class="muted settings-lead" data-i18n="settings.workflowsLead">在本机添加引擎与编辑器并对接工作流，经本机助手执行。这是单机开源版，不含云端平台通道。</p>
+
+          <div class="workflow-section workflow-section-creds">
+            <h4 class="settings-subhead" data-i18n="engine.credsHeading">执行凭证</h4>
+            <p class="muted settings-howto-inline" data-i18n="engine.credsLead">引擎与自定义文生图需要对应通道凭证，并连接本机助手。分镜生成由所选引擎决定。</p>
+            <div class="settings-creds-grid">
+              <div class="settings-cred-block">
+                <h5 class="settings-cred-title" data-i18n="settings.channelRh">自定义 RunningHub</h5>
+                <label class="field-label muted" for="rhBaseUrl" data-i18n="settings.rhBaseUrl">API 地址</label>
+                <input type="url" id="rhBaseUrl" class="llm-config-input" data-i18n-placeholder="settings.rhBaseUrlPlaceholder" placeholder="https://www.runninghub.ai" autocomplete="off" spellcheck="false" />
+                <label class="field-label muted" for="rhApiKey" data-i18n="settings.rhApiKey">API Key</label>
+                <input type="password" id="rhApiKey" class="llm-config-input" data-i18n-placeholder="settings.rhApiKeyPlaceholder" placeholder="RunningHub API Key" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="settings-cred-block">
+                <h5 class="settings-cred-title" data-i18n="settings.channelComfy">ComfyUI</h5>
+                <label class="field-label muted" for="comfyBaseUrl" data-i18n="settings.comfyBaseUrl">ComfyUI 地址</label>
+                <input type="url" id="comfyBaseUrl" class="llm-config-input" data-i18n-placeholder="settings.comfyBaseUrlPlaceholder" placeholder="http://127.0.0.1:8188" autocomplete="off" spellcheck="false" />
+                <label class="field-label muted" for="comfyAuthHeader" data-i18n="settings.comfyAuthHeader">可选鉴权头（Authorization 值）</label>
+                <input type="password" id="comfyAuthHeader" class="llm-config-input" data-i18n-placeholder="settings.comfyAuthPlaceholder" placeholder="Bearer …（可空）" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+            <p class="muted llm-config-tip" data-i18n="engine.credsTip">凭证写入本机助手，不经过本站。请先在「本机助手」检测连接为绿灯。</p>
+            <button type="button" class="btn btn-ghost btn-sm" data-goto-settings-tab="agent" data-i18n="settings.gotoAgent">去「本机助手」…</button>
+          </div>
+
+          <div class="workflow-section workflow-section-my-engines">
+            <div class="workflow-section-head">
+              <h4 class="settings-subhead" data-i18n="engine.mineHeading">引擎</h4>
+              <button type="button" id="btnEngineAddToggle" class="btn btn-primary btn-sm" data-i18n="engine.add">添加引擎</button>
+            </div>
+            <p class="muted settings-howto-inline" data-i18n="engine.mineLead">添加生成引擎：选择时序方式，并对接主段 / 桥段工作流。已启用且主段已对接的引擎会出现在分镜下拉中。</p>
+            <div class="workflow-table-wrap">
+              <table class="workflow-table" id="userEnginesTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="workflow.colName">名称</th>
+                    <th data-i18n="engine.colCaps">能力</th>
+                    <th data-i18n="workflow.colProvider">通道</th>
+                    <th data-i18n="workflow.colStatus">对接状态</th>
+                    <th data-i18n="workflow.colActions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="userEnginesBody"></tbody>
+              </table>
+            </div>
+
+            <div id="engineAddForm" class="editor-add-form hidden">
+              <label class="field-label muted" for="engineName" data-i18n="engine.fieldName">名称</label>
+              <input type="text" id="engineName" class="llm-config-input" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="engineProvider" data-i18n="engine.fieldProvider">执行通道</label>
+              <select id="engineProvider" class="llm-config-input">
+                <option value="runninghub" data-i18n="editor.providerRh">RunningHub（本机助手）</option>
+                <option value="comfyui" data-i18n="editor.providerComfy">ComfyUI（本机助手）</option>
+              </select>
+
+              <fieldset class="engine-caps-fieldset engine-timing-mode-fieldset">
+                <legend class="field-label muted" data-i18n="engine.timingModeLegend">时序方式</legend>
+                <p class="muted settings-howto-inline" data-i18n="engine.timingModeLead">选一种即可，帧率 / 帧数 / 秒数范围会按预设自动填好。</p>
+                <div class="engine-timing-modes" role="radiogroup" aria-label="timing mode">
+                  <label class="engine-timing-mode">
+                    <input type="radio" name="engineTimingMode" value="frames" checked />
+                    <span class="engine-timing-mode-body">
+                      <strong data-i18n="engine.timingModeFrames">帧数模式</strong>
+                      <span class="muted" data-i18n="engine.timingModeFramesHint">类似 Wan：右侧栏调帧数 / 帧率（4n+1，约 2–7 秒）</span>
+                    </span>
+                  </label>
+                  <label class="engine-timing-mode">
+                    <input type="radio" name="engineTimingMode" value="duration" />
+                    <span class="engine-timing-mode-body">
+                      <strong data-i18n="engine.timingModeDuration">秒数模式</strong>
+                      <span class="muted" data-i18n="engine.timingModeDurationHint">类似 MiniMax：右侧栏选 10/15 秒，24fps，帧数按公式自动算</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="row gap" style="margin-top:0.75rem">
+                <button type="button" id="btnEngineDockMain" class="btn btn-ghost btn-sm" data-i18n="engine.dockMain">对接主段</button>
+                <button type="button" id="btnEngineDockBridge" class="btn btn-ghost btn-sm" data-i18n="engine.dockBridge">对接桥段</button>
+                <span id="engineDockPreview" class="muted"></span>
+              </div>
+              <div class="row gap" style="margin-top:0.75rem">
+                <button type="button" id="btnEngineSave" class="btn btn-primary btn-sm" data-i18n="engine.save">保存引擎</button>
+                <button type="button" id="btnEngineCancel" class="btn btn-ghost btn-sm" data-i18n="common.cancel">取消</button>
+                <span id="engineSaveStatus" class="muted"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="workflow-section workflow-section-features">
+            <div class="workflow-section-head">
+              <h4 class="settings-subhead" data-i18n="workflow.t2iHeading">文生图与附加功能</h4>
+              <button type="button" id="btnFeatureAddToggle" class="btn btn-primary btn-sm" data-i18n="workflow.addFeature">添加功能</button>
+            </div>
+            <p class="muted settings-howto-inline" data-i18n="workflow.featuresLead">文生图按下方渠道对接；分镜 I2V/FLF 请添加引擎。附加功能仅高级用途。</p>
+            <fieldset class="settings-channel-fieldset">
+              <legend class="field-label muted" data-i18n="workflow.t2iChannelLegend">文生图渠道</legend>
+              <label class="channel-option">
+                <input type="radio" name="videoChannel" value="custom_rh" checked />
+                <span data-i18n="settings.channelRh">自定义 RunningHub</span>
+              </label>
+              <label class="channel-option">
+                <input type="radio" name="videoChannel" value="comfyui" />
+                <span data-i18n="settings.channelComfy">ComfyUI</span>
+              </label>
+            </fieldset>
+            <div class="workflow-table-wrap">
+              <table class="workflow-table" id="featuresWorkflowTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="workflow.colName">名称</th>
+                    <th data-i18n="workflow.colType">类型</th>
+                    <th data-i18n="workflow.colProvider">通道</th>
+                    <th data-i18n="workflow.colStatus">对接状态</th>
+                    <th data-i18n="workflow.colActions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="featuresWorkflowBody"></tbody>
+              </table>
+            </div>
+            <div id="featureAddForm" class="editor-add-form hidden">
+              <label class="field-label muted" for="featureId" data-i18n="workflow.featureId">功能 ID</label>
+              <input type="text" id="featureId" class="llm-config-input" data-i18n-placeholder="workflow.featureIdPlaceholder" placeholder="如 custom_fx" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="featureName" data-i18n="workflow.featureName">显示名称</label>
+              <input type="text" id="featureName" class="llm-config-input" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="featureDesc" data-i18n="workflow.featureDesc">说明</label>
+              <input type="text" id="featureDesc" class="llm-config-input" autocomplete="off" spellcheck="false" />
+              <fieldset class="settings-channel-fieldset" style="margin-top:0.75rem">
+                <legend class="field-label muted" data-i18n="workflow.requiredBindings">必需语义字段</legend>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="startImage" checked /> startImage</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="endImage" /> endImage</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="prompt" checked /> prompt</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="width" /> width</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="height" /> height</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="inputVideo" /> inputVideo</label>
+                <label class="channel-option"><input type="checkbox" name="featureBind" value="inputAudio" /> inputAudio</label>
+              </fieldset>
+              <div class="row gap" style="margin-top:0.75rem">
+                <button type="button" id="btnFeatureSave" class="btn btn-primary btn-sm" data-i18n="workflow.saveFeature">保存功能</button>
+                <button type="button" id="btnFeatureCancel" class="btn btn-ghost btn-sm" data-i18n="common.cancel">取消</button>
+                <span id="featureSaveStatus" class="muted"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="workflow-section workflow-section-my-editors">
+            <div class="workflow-section-head">
+              <h4 class="settings-subhead" data-i18n="editor.mineHeading">编辑器</h4>
+              <button type="button" id="btnEditorAddToggle" class="btn btn-primary btn-sm" data-i18n="editor.addCustom">添加自定义编辑器</button>
+            </div>
+            <p class="muted settings-howto-inline" data-i18n="editor.settingsLead">自定义编辑器经本机助手执行，追加进时间轴右键菜单。</p>
+            <div class="workflow-table-wrap">
+              <table class="workflow-table" id="editorsWorkflowTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="workflow.colName">名称</th>
+                    <th data-i18n="workflow.colType">类型</th>
+                    <th data-i18n="workflow.colProvider">通道</th>
+                    <th data-i18n="workflow.colStatus">对接状态</th>
+                    <th data-i18n="workflow.colActions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="editorsWorkflowBody"></tbody>
+              </table>
+            </div>
+            <div id="userEditorsList" class="hidden" aria-hidden="true"></div>
+
+            <div id="editorAddForm" class="editor-add-form hidden">
+              <label class="field-label muted" for="editorName" data-i18n="editor.fieldName">名称</label>
+              <input type="text" id="editorName" class="llm-config-input" autocomplete="off" spellcheck="false" />
+
+              <label class="field-label muted" for="editorCategory" data-i18n="editor.fieldCategory">分类</label>
+              <select id="editorCategory" class="llm-config-input">
+                <option value="custom" data-i18n="editor.category.custom">自定义</option>
+                <option value="image_edit" data-i18n="editor.category.image_edit">图片编辑</option>
+                <option value="upscale" data-i18n="editor.category.upscale">超分</option>
+                <option value="interpolate" data-i18n="editor.category.interpolate">补帧</option>
+                <option value="restyle" data-i18n="editor.category.restyle">风格化</option>
+                <option value="inpaint" data-i18n="editor.category.inpaint">重绘</option>
+              </select>
+
+              <label class="field-label muted" for="editorProvider" data-i18n="editor.fieldProvider">执行通道</label>
+              <select id="editorProvider" class="llm-config-input">
+                <option value="runninghub" data-i18n="editor.providerRh">RunningHub（本机助手）</option>
+                <option value="comfyui" data-i18n="editor.providerComfy">ComfyUI（本机助手）</option>
+              </select>
+
+              <div class="row gap" style="margin-top:0.5rem">
+                <label class="inline" style="margin-left:0">
+                  <span data-i18n="editor.fieldInput">输入</span>
+                  <select id="editorInput">
+                    <option value="image" data-i18n="editor.inputImage">图片（帧）</option>
+                    <option value="video" data-i18n="editor.inputVideo">视频（区间）</option>
+                  </select>
+                </label>
+                <label class="inline" style="margin-left:0">
+                  <span data-i18n="editor.fieldOutput">输出</span>
+                  <select id="editorOutput">
+                    <option value="video" selected data-i18n="editor.outputVideo">视频</option>
+                    <option value="image" data-i18n="editor.outputImage">图片</option>
+                  </select>
+                </label>
+              </div>
+
+              <fieldset class="settings-channel-fieldset" style="margin-top:0.75rem">
+                <legend class="field-label muted" data-i18n="editor.fieldAccepts">适用选区</legend>
+                <label class="channel-option"><input type="checkbox" id="editorAcceptFrame" value="frame" checked /> <span data-i18n="editor.acceptFrame">单帧</span></label>
+                <label class="channel-option"><input type="checkbox" id="editorAcceptRange" value="range" checked /> <span data-i18n="editor.acceptRange">区间</span></label>
+                <label class="channel-option"><input type="checkbox" id="editorAcceptClip" value="clip" checked /> <span data-i18n="editor.acceptClip">整段</span></label>
+              </fieldset>
+
+              <div id="editorRhWorkflowRow">
+                <label class="field-label muted" for="editorWorkflowId" data-i18n="editor.fieldWorkflowId">RunningHub workflowId</label>
+                <input type="text" id="editorWorkflowId" class="llm-config-input" autocomplete="off" spellcheck="false" />
+              </div>
+
+              <div class="row gap" style="margin-top:0.75rem">
+                <button type="button" id="btnEditorDock" class="btn btn-ghost btn-sm" data-i18n="editor.dockWorkflow">对接工作流</button>
+                <span id="editorDockStatus" class="muted"></span>
+              </div>
+
+              <div class="row gap" style="margin-top:0.75rem">
+                <button type="button" id="btnEditorSave" class="btn btn-primary btn-sm" data-i18n="editor.save">保存编辑器</button>
+                <button type="button" id="btnEditorCancel" class="btn btn-ghost btn-sm" data-i18n="common.cancel">取消</button>
+                <span id="editorSaveStatus" class="muted"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settingsTabLlm" class="settings-pane hidden" data-pane="llm">
+          <p class="muted settings-lead" data-i18n="settings.llmLead">经本机助手转发 OpenAI 兼容接口，Key 留在本机、不经过本站服务器。</p>
+
+          <div id="llmChannelCustom" class="channel-panel">
+            <label class="field-label muted" for="llmBaseUrl" data-i18n="settings.llmBaseUrl">API 地址</label>
+            <input type="url" id="llmBaseUrl" class="llm-config-input" data-i18n-placeholder="settings.llmBaseUrlPlaceholder" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
+            <label class="field-label muted" for="llmApiKey" data-i18n="settings.llmApiKey">API Key</label>
+            <input type="password" id="llmApiKey" class="llm-config-input" data-i18n-placeholder="settings.llmApiKeyPlaceholder" placeholder="sk-or-…" autocomplete="off" spellcheck="false" />
+            <label class="field-label muted" for="llmModelSelect" data-i18n="settings.llmModel">模型</label>
+            <div class="row gap llm-model-row">
+              <select id="llmModelSelect" class="llm-config-input llm-model-select"></select>
+              <button type="button" id="btnLlmRefreshModels" class="btn btn-ghost btn-sm" data-i18n="settings.llmRefreshModels" data-i18n-title="settings.llmRefreshModelsTitle" title="刷新 OpenRouter 周排行免费模型">刷新热门</button>
+            </div>
+            <div class="row gap llm-model-custom-row hidden" id="llmModelCustomRow">
+              <input type="text" id="llmModel" class="llm-config-input llm-model-input" data-i18n-placeholder="settings.llmModelPlaceholder" placeholder="nvidia/nemotron-3-ultra-550b-a55b:free" autocomplete="off" spellcheck="false" />
+              <button type="button" id="btnLlmAddCustomModel" class="btn btn-ghost btn-sm" data-i18n="settings.llmAddModel">添加</button>
+            </div>
+            <p class="muted llm-config-tip" data-i18n="settings.llmTip">Key 经本机助手转发，不经过本站服务器。请先启动助手并检测连接。</p>
+            <button type="button" class="btn btn-ghost btn-sm" data-goto-settings-tab="agent" data-i18n="settings.gotoAgent">去「本机助手」…</button>
+          </div>
+        </section>
+
+        <section id="settingsTabAgent" class="settings-pane hidden" data-pane="agent">
+          <div id="localAgentPanel" class="local-agent-panel">
+            <strong class="local-agent-title" data-i18n="agent.panelTitle">本机助手</strong>
+            <p class="muted settings-howto-inline" data-i18n-html="agent.panelLeadHtml">自定义渠道由<strong>本机助手</strong>发起任务（不再浏览器直连第三方），请先下载并启动助手。</p>
+            <ol class="settings-howto-list agent-steps">
+              <li data-i18n-html="agent.step1Html">点击下方<strong>下载本机助手</strong>，解压到任意文件夹。</li>
+              <li data-i18n-html="agent.step2Html">双击 <code>start.bat</code>，保持黑窗口开启；看到「已就绪」即可。</li>
+              <li data-i18n-html="agent.step3Html">回到本页点击<strong>检测连接</strong>，绿灯后即可填写渠道并生成。</li>
+            </ol>
+            <div class="row gap agent-actions">
+              <a class="btn btn-primary btn-sm" id="btnAgentDownload" href="/static/agent/vflow-local-agent.zip" download data-i18n="agent.download">下载本机助手</a>
+              <button type="button" id="btnAgentCheck" class="btn btn-ghost btn-sm" data-i18n="agent.check">检测连接</button>
+              <button type="button" id="btnAgentCopyCmd" class="btn btn-ghost btn-sm" data-i18n="agent.copyCmd">复制启动命令</button>
+              <span id="agentCheckStatus" class="muted"></span>
+            </div>
+            <div class="row gap agent-base-row">
+              <label class="field-label muted" for="agentBaseUrl" data-i18n="agent.baseUrl">助手地址</label>
+              <input type="url" id="agentBaseUrl" class="llm-config-input" value="http://127.0.0.1:39281" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="row gap agent-base-row">
+              <label class="field-label muted" for="agentAssetsDir" data-i18n="agent.assetsDir">本地素材存储路径</label>
+              <input type="text" id="agentAssetsDir" class="llm-config-input" placeholder="" autocomplete="off" spellcheck="false" />
+              <button type="button" id="btnSetAssetsDir" class="btn btn-ghost btn-sm" data-i18n="agent.setAssetsDir">设置</button>
+              <span id="assetsDirStatus" class="muted"></span>
+            </div>
+            <div class="agent-troubleshoot hidden">
+              <p class="muted" data-i18n="agent.troubleshootTitle">连不上时请检查：</p>
+              <ul class="settings-howto-list">
+                <li data-i18n="agent.trouble1">是否已双击 start.bat，且窗口未关闭</li>
+                <li data-i18n="agent.trouble2">地址是否为 http://127.0.0.1:39281（本机）</li>
+                <li data-i18n="agent.trouble3">杀毒/防火墙是否拦截了本机 Python</li>
+              </ul>
+              <p class="muted agent-troubleshoot-detail"></p>
+            </div>
+          </div>
+        </section>
+
+        <section id="settingsTabCommon" class="settings-pane hidden" data-pane="common">
+          <p class="muted settings-lead" data-i18n="settings.commonLead">负向提示词随当前项目保存；并发与鸭鸭图加密会记住本机上次选择。</p>
+          <div id="sharedSettings">
+            <label class="field-label muted" data-i18n="inspector.negativePrompt">负向提示词</label>
+            <textarea id="negativeInput" rows="3">{{ default_negative }}</textarea>
+            <label class="channel-option" style="margin-top:0.75rem">
+              <input type="checkbox" id="useDuckEncrypt" />
+              <span data-i18n="settings.useDuckEncrypt">使用鸭鸭图加密</span>
+            </label>
+            <p class="muted settings-howto-inline" id="useDuckEncryptTip" data-i18n="settings.useDuckEncryptTipCustom">请自行配置是否含鸭鸭图编码的工作流；开启本开关后，软件对成片自动解密。</p>
+            <div class="row gap decrypt-row" id="duckPasswordRow" style="margin-top:0.5rem">
+              <label class="inline" style="margin-left:0">
+                <span data-i18n="inspector.duckPassword">鸭鸭图密码</span>
+                <input type="text" id="duckPassword" class="secret-input" data-i18n-placeholder="inspector.duckPasswordPlaceholder" placeholder="默认空" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" spellcheck="false" />
+              </label>
+            </div>
+            <label class="inline" style="margin-top:0.75rem;margin-left:0;display:inline-flex">
+              <span data-i18n="inspector.concurrency">并发</span>
+              <select id="concurrency">
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </div>
+      <div id="workflowDockDrawer" class="workflow-dock-drawer hidden" aria-hidden="true">
+        <div class="workflow-dock-panel">
+          <div class="workflow-dock-head">
+            <strong id="workflowDockTitle" data-i18n="workflow.dockTitle">对接工作流</strong>
+            <button type="button" id="btnWorkflowDockClose" class="btn btn-ghost btn-sm" data-i18n="common.cancel">取消</button>
+          </div>
+          <p id="workflowDockHint" class="muted settings-howto-inline" data-i18n="workflow.dockHint">上传完整画布工作流 JSON，用 LLM 自动生成对接适配文件。</p>
+          <div id="dockRhWorkflowRow">
+            <label class="field-label muted" for="dockWorkflowId" data-i18n="editor.fieldWorkflowId">RunningHub workflowId</label>
+            <input type="text" id="dockWorkflowId" class="llm-config-input" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="adapter-tools" style="margin-top:0.75rem">
+            <div class="row gap">
+              <label class="file-btn btn btn-ghost btn-sm">
+                <span data-i18n="settings.uploadWorkflow">上传工作流 JSON</span>
+                <input type="file" id="dockWorkflowFile" accept=".json,application/json" hidden />
+              </label>
+              <button type="button" id="btnDockLlm" class="btn btn-primary btn-sm" data-i18n="settings.llmRecognize">LLM 识别</button>
+              <span id="dockAdapterStatus" class="muted"></span>
+            </div>
+            <div id="dockParamsVisibility" class="params-visibility-list hidden"></div>
+            <textarea id="dockAdapterJson" class="adapter-json" rows="8" data-i18n-placeholder="workflow.dockJsonPlaceholder" placeholder="对接适配预览…" spellcheck="false"></textarea>
+          </div>
+          <div class="row gap" style="margin-top:0.75rem">
+            <button type="button" id="btnDockSave" class="btn btn-primary btn-sm" data-i18n="settings.saveAdapter">保存对接</button>
+            <button type="button" id="btnDockClear" class="btn btn-ghost btn-sm" data-i18n="workflow.clearDock">清除对接</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="storyboardModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="storyboardModalTitle">
+    <div class="modal-backdrop" data-close-storyboard></div>
+    <div class="modal-card storyboard-modal-card">
+      <div class="modal-head">
+        <h3 id="storyboardModalTitle" data-i18n="storyboard.title">剧情分镜工具ai+</h3>
+        <div class="storyboard-step-tabs" role="tablist">
+          <button type="button" class="storyboard-step-tab is-active" data-storyboard-step="script" data-i18n="storyboard.stepScript">1 剧本</button>
+          <button type="button" class="storyboard-step-tab" data-storyboard-step="prompts" data-i18n="storyboard.stepPrompts">2 本集提示词</button>
+        </div>
+        <div class="modal-head-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-close-storyboard data-i18n="storyboard.close">关闭</button>
+        </div>
+      </div>
+      <div class="storyboard-modal-body">
+        <p id="storyboardBoundHint" class="muted storyboard-bound-hint"></p>
+        <div id="storyboardStepScript" class="storyboard-step-panel">
+          <div class="script-step-layout">
+            <aside class="script-library">
+              <div class="row gap script-library-head">
+                <p class="field-label muted" data-i18n="storyboard.myScripts">我的剧本</p>
+                <button type="button" id="btnScriptNew" class="btn btn-ghost btn-sm" data-i18n="storyboard.scriptNew">新建</button>
+              </div>
+              <div id="scriptLibraryList" class="script-library-list"></div>
+              <p id="scriptLibraryEmpty" class="muted empty-hint" data-i18n="storyboard.scriptLibraryEmpty">还没有剧本，先新建或生成一部。</p>
+            </aside>
+            <div class="script-editor">
+              <div class="row gap">
+                <label class="inline" style="margin-left:0">
+                  <span data-i18n="storyboard.scriptTitle">作品标题</span>
+                  <input type="text" id="scriptTitle" data-i18n-placeholder="storyboard.scriptTitlePlaceholder" placeholder="未命名剧本" />
+                </label>
+                <div class="storyboard-format-row" role="group">
+                  <button type="button" id="btnScriptFormatShort" class="btn btn-ghost btn-sm is-active" data-script-format="short" data-i18n="storyboard.formatShort">短片</button>
+                  <button type="button" id="btnScriptFormatSeries" class="btn btn-ghost btn-sm" data-script-format="series" data-i18n="storyboard.formatSeries">分集</button>
+                </div>
+              </div>
+              <label class="field-label muted" for="scriptSceneBible" data-i18n="storyboard.sceneBible">画面/人物设定</label>
+              <textarea id="scriptSceneBible" rows="2" data-i18n-placeholder="storyboard.scenePlaceholder" placeholder="人物、场景、姿态、构图…"></textarea>
+              <label class="field-label muted" for="scriptPlotDirection" data-i18n="storyboard.plotDirection">剧情方向</label>
+              <textarea id="scriptPlotDirection" rows="2" data-i18n-placeholder="storyboard.plotPlaceholder" placeholder="希望发生的情节、情绪变化…"></textarea>
+              <div class="row gap llm-count-row hidden" id="scriptSeriesCountRow">
+                <label class="inline" style="margin-left:0">
+                  <span data-i18n="storyboard.episodeCount">集数</span>
+                  <input type="number" id="scriptEpisodeCount" min="1" max="12" value="3" />
+                </label>
+                <label class="inline checkbox-inline">
+                  <input type="checkbox" id="scriptLlmPickCount" />
+                  <span data-i18n="storyboard.llmPickEpisodes">集数交给 LLM</span>
+                </label>
+              </div>
+              <div class="row gap">
+                <label class="inline" style="margin-left:0">
+                  <span data-i18n="storyboard.llmModel">模型</span>
+                  <select id="scriptLlmModel" class="storyboard-llm-model-select"></select>
+                </label>
+                <button type="button" id="btnScriptGenerate" class="btn btn-primary" data-i18n="storyboard.generateScript">生成可读剧本</button>
+                <button type="button" id="btnScriptSave" class="btn" data-i18n="storyboard.saveScript">保存剧本</button>
+                <span id="scriptLlmStatus" class="muted"></span>
+              </div>
+              <div id="scriptEpisodeNav" class="script-episode-nav hidden"></div>
+              <label class="field-label muted" for="scriptEpisodeTitle" data-i18n="storyboard.episodeTitle">本集标题</label>
+              <input type="text" id="scriptEpisodeTitle" data-i18n-placeholder="storyboard.episodeTitlePlaceholder" placeholder="第 1 集" />
+              <label class="field-label muted" for="scriptEpisodeBody" data-i18n="storyboard.episodeScript">本集可读正文</label>
+              <textarea id="scriptEpisodeBody" rows="8" data-i18n-placeholder="storyboard.episodeScriptPlaceholder" placeholder="用人话写这一集发生了什么，可含场面与对白。不要写图生视频提示词。"></textarea>
+              <label class="field-label muted" for="scriptEpisodeBeats" data-i18n="storyboard.episodeBeats">场次情节点</label>
+              <textarea id="scriptEpisodeBeats" rows="4" data-i18n-placeholder="storyboard.episodeBeatsPlaceholder" placeholder="每行一个情节点，可用 标题：描述"></textarea>
+              <aside class="storyboard-polish script-polish">
+                <h4 class="storyboard-polish-title" data-i18n="storyboard.scriptPolishTitle">打磨剧本</h4>
+                <textarea id="scriptPolishInput" rows="3" data-i18n-placeholder="storyboard.scriptPolishPlaceholder" placeholder="例如：把第2集结尾写清楚；或压缩对白。"></textarea>
+                <div class="row gap">
+                  <button type="button" id="btnScriptPolish" class="btn btn-primary" data-i18n="storyboard.polishRun">生成打磨建议</button>
+                  <button type="button" id="btnScriptApplyPatch" class="btn" disabled data-i18n="storyboard.polishApply">应用变更</button>
+                </div>
+                <p id="scriptPolishStatus" class="muted"></p>
+                <div id="scriptPolishDiff" class="storyboard-polish-diff muted" data-i18n="storyboard.scriptPolishDiffEmpty">先预览剧本变更，再决定是否写入。</div>
+              </aside>
+              <div class="row gap">
+                <button type="button" id="btnGotoPrompts" class="btn btn-primary" data-i18n="storyboard.gotoPrompts">用本集去写提示词</button>
+                <button type="button" id="btnScriptDelete" class="btn btn-ghost" data-i18n="storyboard.deleteScript">删除剧本</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="storyboardStepPrompts" class="storyboard-step-panel hidden">
+        <div class="llm-assist" id="llmAssist">
+          <div class="llm-assist-head">
+            <h3 class="llm-assist-title" data-i18n="storyboard.llmAssist">LLM 辅助分镜</h3>
+          </div>
+          <div class="row gap storyboard-engine-row">
+            <label class="inline" style="margin-left:0">
+              <span data-i18n="storyboard.engine">分镜引擎</span>
+              <select id="storyboardEngine" class="storyboard-engine-select"></select>
+            </label>
+            <span id="storyboardEngineCaps" class="muted"></span>
+          </div>
+          <div id="storyboardMultiRefPanel" class="storyboard-multiref-panel hidden">
+            <label class="inline checkbox-inline">
+              <input type="checkbox" id="storyboardUseMultiRef" />
+              <span data-i18n="storyboard.useMultiRef">使用多参考素材</span>
+            </label>
+            <div id="storyboardRefList" class="storyboard-ref-list"></div>
+            <div class="row gap">
+              <button type="button" id="btnAddStoryboardRefImage" class="btn btn-ghost btn-sm" data-i18n="storyboard.addRefImage">添加参考图</button>
+              <button type="button" id="btnAddStoryboardRefVideo" class="btn btn-ghost btn-sm" data-i18n="storyboard.addRefVideo">添加参考视频</button>
+              <button type="button" id="btnAddStoryboardRefAudio" class="btn btn-ghost btn-sm" data-i18n="storyboard.addRefAudio">添加参考音频</button>
+              <input type="file" id="storyboardRefFileInput" class="hidden" accept="image/*,video/*,audio/*" />
+            </div>
+          </div>
+          <details id="storyboardWritingHints" class="storyboard-writing-hints">
+            <summary data-i18n="storyboard.writingHints">写法参考</summary>
+            <div id="storyboardWritingHintsBody" class="muted"></div>
+            <button type="button" id="btnInsertPromptSkeleton" class="btn btn-ghost btn-sm" data-i18n="storyboard.insertSkeleton">填入示例骨架到当前段</button>
+          </details>
+          <label class="field-label muted" for="sceneDescription" data-i18n="storyboard.sceneDescription">首帧画面描述</label>
+          <textarea id="sceneDescription" rows="2" data-i18n-placeholder="storyboard.scenePlaceholder" placeholder="人物、场景、姿态、构图…"></textarea>
+          <label class="field-label muted" for="plotDirection" data-i18n="storyboard.plotDirection">剧情方向</label>
+          <textarea id="plotDirection" rows="2" data-i18n-placeholder="storyboard.plotPlaceholder" placeholder="希望发生的情节、情绪变化…"></textarea>
+          <div class="row gap llm-count-row">
+            <label class="inline" style="margin-left:0">
+              <span data-i18n="storyboard.llmModel">模型</span>
+              <select id="storyboardLlmModel" class="storyboard-llm-model-select"></select>
+            </label>
+            <label class="inline" style="margin-left:0">
+              <span data-i18n="storyboard.segmentCount">主段数量</span>
+              <input type="number" id="segmentCount" min="2" max="8" value="3" />
+            </label>
+            <label class="inline" data-i18n-title="storyboard.targetDurationTitle" title="主段数可设时，总时长=主段数×主段时长，不可改；段数交给 LLM 时可手动设定目标总时长">
+              <span data-i18n="storyboard.targetDuration">目标总时长(秒)</span>
+              <input type="number" id="storyboardTargetDuration" min="10" max="120" step="0.5" value="15" />
+            </label>
+            <label class="inline" data-i18n-title="storyboard.mainDurationTitle" title="生成提示词前设定每段主段秒数；MiniMax 默认 10，Wan 默认 5">
+              <span data-i18n="storyboard.mainDuration">默认主段时长(秒)</span>
+              <input type="number" id="storyboardMainDuration" min="2" max="15" step="0.5" value="5" />
+            </label>
+            <label class="inline checkbox-inline">
+              <input type="checkbox" id="llmPickCount" />
+              <span data-i18n="storyboard.llmPickCount">段数交给 LLM</span>
+            </label>
+            <label class="inline checkbox-inline" data-i18n-title="storyboard.autoBridgeTitle" title="层1≥2主时，尊重 LLM 的软切/硬切：软切铺桥延长，硬切则两主段贴合">
+              <input type="checkbox" id="llmAutoBridge" checked />
+              <span data-i18n="storyboard.autoBridge">自动生成桥段</span>
+            </label>
+          </div>
+          <div class="row gap">
+            <button type="button" id="btnLlmGenerate" class="btn btn-primary" disabled data-i18n="storyboard.generatePrompts">
+              生成各段提示词
+            </button>
+            <button type="button" id="btnRegenBridges" class="btn" disabled data-i18n="storyboard.regenBridgePrompts" data-i18n-title="storyboard.regenBridgeTitle" title="根据当前层1相邻主段重新生成桥提示词并重排层2">
+              重新生成桥提示词
+            </button>
+            <span id="llmStatus" class="muted"></span>
+          </div>
+          <p id="llmHint" class="muted llm-hint" data-i18n="storyboard.hint">请先在顶栏「设置 → 语言模型」配置渠道。主段落在层1；桥段在层2。流程：生成各段提示词 → 生成待跑主段 → 主段出片后「生成待跑桥段」。</p>
+        </div>
+
+        <div class="storyboard-workbench">
+          <section class="storyboard-outline">
+            <div class="storyboard-outline-head row gap">
+              <div>
+                <p class="field-label muted" data-i18n="storyboard.synopsis">可读剧本</p>
+                <p id="storyboardSynopsis" class="storyboard-synopsis muted" data-i18n="storyboard.synopsisEmpty">生成后会在这里显示整剧摘要，便于先阅读再打磨。</p>
+              </div>
+              <div class="row gap">
+                <button type="button" id="btnAddPrompt" class="btn" data-i18n="storyboard.addMain">添加主段</button>
+                <button type="button" id="btnImport" class="btn btn-ghost" data-i18n="storyboard.importText">从文本导入</button>
+              </div>
+            </div>
+            <p id="promptEmptyHint" class="empty-hint muted" data-i18n="storyboard.emptyHint">添加、导入或 LLM 生成后即可开始；≥2 主时可自动在层2生成桥槽（时长同主段）</p>
+            <div id="promptList" class="prompt-list"></div>
+            <textarea id="importBox" class="hidden" rows="5" data-i18n-placeholder="storyboard.importPlaceholder" placeholder="每行一条正向提示词，粘贴后点「确认导入」"></textarea>
+            <div id="importActions" class="row gap hidden">
+              <button type="button" id="btnConfirmImport" class="btn" data-i18n="storyboard.confirmImport">确认导入</button>
+              <button type="button" id="btnCancelImport" class="btn btn-ghost" data-i18n="storyboard.cancelImport">取消</button>
+            </div>
+          </section>
+
+          <aside class="storyboard-polish">
+            <div class="storyboard-polish-head">
+              <h4 class="storyboard-polish-title" data-i18n="storyboard.polishTitle">分镜打磨</h4>
+              <div class="storyboard-polish-scope-row" role="group" aria-label="polish scope">
+                <button type="button" id="btnPolishScopeAll" class="btn btn-ghost btn-sm is-active" data-polish-scope="all" data-i18n="storyboard.polishScopeAll">全部</button>
+                <button type="button" id="btnPolishScopeSelected" class="btn btn-ghost btn-sm" data-polish-scope="selected" data-i18n="storyboard.polishScopeSelected">所选</button>
+              </div>
+              <p id="storyboardPolishScope" class="muted" data-i18n="storyboard.polishScopeSummary">将打磨 0 段（层1×0 · 层2×0）</p>
+            </div>
+            <label class="field-label muted" for="storyboardPolishInput" data-i18n="storyboard.polishInput">修改指令</label>
+            <textarea id="storyboardPolishInput" rows="5" data-i18n-placeholder="storyboard.polishPlaceholder" placeholder="例如：把第2段提示词写具体一点；或压缩到 4 秒并改成中近景。"></textarea>
+            <div class="row gap">
+              <button type="button" id="btnStoryboardPolish" class="btn btn-primary" data-i18n="storyboard.polishRun">生成打磨建议</button>
+              <button type="button" id="btnStoryboardApplyPatch" class="btn" disabled data-i18n="storyboard.polishApply">应用变更</button>
+            </div>
+            <p id="storyboardPolishStatus" class="muted"></p>
+            <div id="storyboardPolishDiff" class="storyboard-polish-diff muted" data-i18n="storyboard.polishDiffEmpty">LLM 会按当前范围返回 patch，先预览变更，再决定是否写入。</div>
+          </aside>
+        </div>
+        <div class="row gap actions">
+          <button type="button" id="btnStart" class="btn btn-primary" data-i18n="storyboard.startMainBatch" data-i18n-title="storyboard.startMainBatchTitle" title="批量生成尚未成功或已标脏的主段（共用首帧 I2V）">生成待跑主段</button>
+          <button type="button" id="btnStartBridges" class="btn btn-bridge-batch" data-i18n="storyboard.startBridgeBatch" data-i18n-title="storyboard.startBridgeBatchTitle" title="批量生成尚未成功或已标脏的桥段（从前后主视频提取首尾帧 FLF）">生成待跑桥段</button>
+          <button type="button" id="btnStop" class="btn btn-danger" disabled data-i18n="storyboard.stopQueue" data-i18n-title="storyboard.stopQueueTitle" title="仅取消等待中的任务；进行中需在「生成队列」强制结束">停止排队</button>
+        </div>
+        <span id="globalStatus" class="muted inspector-status"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="editorInputModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editorInputTitle">
+    <div class="modal-backdrop" data-close-editor-input></div>
+    <div class="modal-card editor-input-modal-card">
+      <div class="modal-head">
+        <h3 id="editorInputTitle" data-i18n="editor.inputModal.titleFallback">运行参数</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-editor-input id="editorInputCancel" data-i18n="editor.inputModal.cancel">取消</button>
+      </div>
+      <p id="editorInputDesc" class="muted modal-hint"></p>
+      <form id="editorInputForm" autocomplete="off">
+        <div id="editorInputFields" class="editor-input-fields"></div>
+        <div class="row gap editor-input-actions">
+          <button type="submit" id="editorInputSubmit" class="btn btn-primary" data-i18n="editor.inputModal.submit">开始</button>
+          <button type="button" class="btn btn-ghost" data-close-editor-input data-i18n="editor.inputModal.cancel">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="framePickerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="framePickerTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="framePickerTitle" data-i18n="framePicker.title">节选视频帧</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-modal data-i18n="framePicker.close">关闭</button>
+      </div>
+      <p id="framePickerHint" class="muted modal-hint"></p>
+      <video id="pickerVideo" controls playsinline></video>
+      <div class="row gap picker-controls">
+        <button type="button" id="btnPickerBack" class="btn btn-ghost" data-i18n="framePicker.back">−0.2s</button>
+        <button type="button" id="btnPickerFwd" class="btn btn-ghost" data-i18n="framePicker.forward">+0.2s</button>
+        <span id="pickerTime" class="muted">0.00s</span>
+      </div>
+      <div class="picker-preview-row">
+        <canvas id="pickerCanvas" class="hidden"></canvas>
+        <img id="pickerThumb" class="picker-thumb hidden" alt="当前帧预览" />
+      </div>
+      <div class="row gap">
+        <button type="button" id="btnCaptureFrame" class="btn btn-primary" data-i18n="framePicker.capture">截取当前帧</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/i18n.js?v=2"></script>
+  <script src="/static/vflow-adapter.js?v=4"></script>
+  <script src="/static/vflow-local.js?v=local-queue-1"></script>
+  <script src="/static/vflow-user-engines.js?v=1"></script>
+  <script src="/static/vflow-storyboard-engines.js?v=2"></script>
+  <script src="/static/vflow-features.js?v=2"></script>
+  <script src="/static/vflow-editors.js?v=editors-2"></script>
+  <script src="/static/vflow-editor-input-modal.js?v=2"></script>
+  <script src="/static/vendor/webm-muxer.js?v=1"></script>
+  <script src="/static/export-offline.js?v=1"></script>
+  <script src="/static/app.js?v=standalone-1"></script>
+</body>
+</html>

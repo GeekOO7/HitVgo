@@ -1,0 +1,36 @@
+{
+  "editors": [
+    {
+      "id": "platform.upscale",
+      "name": "超分放大",
+      "nameEn": "Upscale",
+      "enabled": true,
+      "workflowId": "",
+      "bindings": {}
+    },
+    {
+      "id": "platform.interpolate",
+      "name": "补帧（丝滑）",
+      "nameEn": "Frame interpolation",
+      "enabled": true,
+      "workflowId": "",
+      "bindings": {}
+    },
+    {
+      "id": "platform.talking",
+      "name": "口播（图生带语音）",
+      "nameEn": "Talking (image + voice)",
+      "enabled": true,
+      "workflowId": "",
+      "bindings": {}
+    },
+    {
+      "id": "platform.t2i",
+      "name": "文生图",
+      "nameEn": "Text-to-image",
+      "enabled": true,
+      "workflowId": "",
+      "bindings": {}
+    }
+  ]
+}
