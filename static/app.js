@@ -13,7 +13,8 @@
   const LLM_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
   const LLM_DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
   const LLM_PICKER_LIMIT = 8;
-  const LLM_CUSTOM_SENTINEL = "__custom__";
+  const LLM_PROVIDERS_MAX = 16;
+  const LLM_MODELS_PER_PROVIDER = 40;
   const RH_DEFAULT_BASE = "https://www.runninghub.ai";
   const COMFY_DEFAULT_BASE = "http://127.0.0.1:8188";
   const SAVE_DEBOUNCE_MS = 400;
@@ -1109,11 +1110,16 @@
   const storyboardPolishScopeEl = document.getElementById("storyboardPolishScope");
   const LLM_LAYOUT_HINT =
     t("storyboard.layoutHint");
-  const llmBaseUrlEl = document.getElementById("llmBaseUrl");
-  const llmApiKeyEl = document.getElementById("llmApiKey");
-  const llmModelEl = document.getElementById("llmModel");
-  const llmModelSelectEl = document.getElementById("llmModelSelect");
-  const llmPlatformModelEl = document.getElementById("llmPlatformModel");
+  const llmActiveSelectEl = document.getElementById("llmActiveSelect");
+  const llmProvidersListEl = document.getElementById("llmProvidersList");
+  const llmAddProviderFormEl = document.getElementById("llmAddProviderForm");
+  const llmNewProviderNameEl = document.getElementById("llmNewProviderName");
+  const llmNewProviderUrlEl = document.getElementById("llmNewProviderUrl");
+  const llmNewProviderKeyEl = document.getElementById("llmNewProviderKey");
+  const llmNewProviderModelEl = document.getElementById("llmNewProviderModel");
+  const btnLlmAddProvider = document.getElementById("btnLlmAddProvider");
+  const btnLlmSaveProvider = document.getElementById("btnLlmSaveProvider");
+  const btnLlmCancelProvider = document.getElementById("btnLlmCancelProvider");
   const storyboardLlmModelEl = document.getElementById("storyboardLlmModel");
   const scriptLlmModelEl = document.getElementById("scriptLlmModel");
   const scriptTitleEl = document.getElementById("scriptTitle");
@@ -1136,12 +1142,7 @@
   const storyboardBoundHint = document.getElementById("storyboardBoundHint");
   const storyboardStepScriptEl = document.getElementById("storyboardStepScript");
   const storyboardStepPromptsEl = document.getElementById("storyboardStepPrompts");
-  const llmModelCustomRow = document.getElementById("llmModelCustomRow");
-  const btnLlmRefreshModels = document.getElementById("btnLlmRefreshModels");
-  const btnLlmRefreshModelsPlatform = document.getElementById(
-    "btnLlmRefreshModelsPlatform"
-  );
-  const btnLlmAddCustomModel = document.getElementById("btnLlmAddCustomModel");
+  let llmEditingProviderId = "";
   const duckPasswordEl = document.getElementById("duckPassword");
   const useDuckEncryptEl = document.getElementById("useDuckEncrypt");
   const duckPasswordRow = document.getElementById("duckPasswordRow");
@@ -5801,7 +5802,7 @@
     storyboardModal.classList.remove("hidden");
     document.body.classList.add("modal-open");
     setActivePhase(1);
-    syncStoryboardModelSelect();
+    populateLlmModelSelects();
     updateLlmButtonState();
     const wantStep = opts && opts.step === "prompts" ? "prompts" : "script";
     setStoryboardStep(wantStep);
@@ -15328,7 +15329,7 @@
     updateChannelSummary();
     updateLlmButtonState();
     syncSettingsChannelPanels();
-    syncStoryboardModelSelect();
+    populateLlmModelSelects();
   }
 
   function defaultVideoChannel() {
@@ -15572,16 +15573,11 @@
           const ok = await checkLocalAgent();
           if (ok) {
             const vcfg = loadVideoChannelConfig();
-            const lcfg = loadLlmLocalConfig();
             try {
               await window.VflowLocal.syncConfig({
                 rh: vcfg.rh,
                 comfy: vcfg.comfy,
-                llm: {
-                  baseUrl: lcfg.baseUrl || "",
-                  apiKey: lcfg.apiKey || "",
-                  model: lcfg.model || "",
-                },
+                llm: getLlmRequestConfig(),
               });
             } catch (e) {
               /* ignore sync errors after connect */
@@ -16838,50 +16834,201 @@
     updateLlmButtonState();
   }
 
+  function uniqueTrimmed(arr, max) {
+    const out = [];
+    const seen = Object.create(null);
+    (arr || []).forEach((x) => {
+      const s = typeof x === "string" ? x.trim() : "";
+      if (!s || seen[s]) return;
+      seen[s] = 1;
+      out.push(s);
+    });
+    return typeof max === "number" ? out.slice(0, max) : out;
+  }
+
+  function newLlmProviderId() {
+    return (
+      "lp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+    );
+  }
+
+  function hostnameLabel(url) {
+    try {
+      const host = new URL(url).hostname || "";
+      return host.replace(/^www\./, "");
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function isOpenRouterUrl(url) {
+    return /openrouter\.ai/i.test(String(url || ""));
+  }
+
+  function providerDisplayName(p) {
+    if (!p) return t("settings.llmProviderUntitled");
+    return (
+      (p.name || "").trim() ||
+      hostnameLabel(p.baseUrl) ||
+      t("settings.llmProviderUntitled")
+    );
+  }
+
+  function llmOptionValue(providerId, modelId) {
+    return String(providerId || "") + "::" + String(modelId || "");
+  }
+
+  function parseLlmOptionValue(value) {
+    const s = String(value || "");
+    const i = s.indexOf("::");
+    if (i < 0) return { providerId: "", modelId: s.trim() };
+    return {
+      providerId: s.slice(0, i),
+      modelId: s.slice(i + 2).trim(),
+    };
+  }
+
+  function loadUserCustomModels() {
+    const arr = loadJsonLocal(LLM_CUSTOM_MODELS_KEY, []);
+    if (!Array.isArray(arr)) return [];
+    return uniqueTrimmed(arr, 30);
+  }
+
+  function defaultLlmProvider() {
+    return {
+      id: newLlmProviderId(),
+      name: "OpenRouter",
+      baseUrl: llmBaseUrlDefault || LLM_DEFAULT_BASE_URL,
+      apiKey: "",
+      models: [],
+    };
+  }
+
+  function normalizeLlmProvider(raw) {
+    const p = raw && typeof raw === "object" ? raw : {};
+    return {
+      id: String(p.id || newLlmProviderId()),
+      name: String(p.name || "").trim(),
+      baseUrl: String(p.baseUrl || "").trim(),
+      apiKey: String(p.apiKey || "").trim(),
+      models: uniqueTrimmed(
+        Array.isArray(p.models) ? p.models : [],
+        LLM_MODELS_PER_PROVIDER
+      ),
+    };
+  }
+
+  function migrateLlmConfig(raw) {
+    const src = raw && typeof raw === "object" ? raw : {};
+    if (Array.isArray(src.providers)) {
+      const providers = src.providers
+        .map(normalizeLlmProvider)
+        .slice(0, LLM_PROVIDERS_MAX);
+      if (!providers.length) providers.push(defaultLlmProvider());
+      let activeId = String(src.activeProviderId || providers[0].id);
+      if (!providers.some((p) => p.id === activeId)) {
+        activeId = providers[0].id;
+      }
+      const active =
+        providers.find((p) => p.id === activeId) || providers[0];
+      let model = String(src.model || "").trim();
+      if (!model) model = active.models[0] || "";
+      if (model && active.models.indexOf(model) < 0) {
+        active.models.unshift(model);
+        active.models = uniqueTrimmed(active.models, LLM_MODELS_PER_PROVIDER);
+      }
+      return { providers, activeProviderId: activeId, model };
+    }
+    const custom = loadUserCustomModels();
+    const baseUrl =
+      String(src.baseUrl || "").trim() ||
+      llmBaseUrlDefault ||
+      LLM_DEFAULT_BASE_URL;
+    const apiKey = String(src.apiKey || "").trim();
+    const model =
+      String(src.model || "").trim() ||
+      llmModelDefault ||
+      LLM_DEFAULT_MODEL;
+    const models = uniqueTrimmed([model].concat(custom), LLM_MODELS_PER_PROVIDER);
+    const p = {
+      id: newLlmProviderId(),
+      name: hostnameLabel(baseUrl) || "OpenRouter",
+      baseUrl,
+      apiKey,
+      models,
+    };
+    return { providers: [p], activeProviderId: p.id, model };
+  }
+
   function loadLlmLocalConfig() {
     try {
       const raw = localStorage.getItem(LLM_CFG_KEY);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
+      const parsed = raw ? JSON.parse(raw) : {};
+      return migrateLlmConfig(parsed && typeof parsed === "object" ? parsed : {});
     } catch (e) {
-      return {};
+      return migrateLlmConfig({});
     }
   }
 
-  function saveLlmLocalConfig() {
-    const local = loadLlmLocalConfig();
-    let model = "";
-    if (llmModelSelectEl && llmModelSelectEl.value === LLM_CUSTOM_SENTINEL) {
-      model = llmModelEl ? llmModelEl.value.trim() : "";
-    } else if (llmModelSelectEl && llmModelSelectEl.value) {
-      model = llmModelSelectEl.value.trim();
-    } else {
-      model = llmModelEl ? llmModelEl.value.trim() : "";
-    }
-    const cfg = {
-      baseUrl: llmBaseUrlEl ? llmBaseUrlEl.value.trim() : "",
-      apiKey: llmApiKeyEl ? llmApiKeyEl.value.trim() : "",
-      model,
-    };
+  function persistLlmConfig(cfg) {
+    const next = migrateLlmConfig(cfg);
     try {
-      localStorage.setItem(LLM_CFG_KEY, JSON.stringify(cfg));
+      localStorage.setItem(LLM_CFG_KEY, JSON.stringify(next));
     } catch (e) {
       console.warn("save llm config failed", e);
     }
+    return next;
+  }
+
+  function getActiveLlmProvider(cfg) {
+    const c = cfg || loadLlmLocalConfig();
+    return (
+      (c.providers || []).find((p) => p.id === c.activeProviderId) ||
+      (c.providers && c.providers[0]) ||
+      defaultLlmProvider()
+    );
+  }
+
+  function flushLlmProviderForm(cfg) {
+    if (!llmProvidersListEl) return cfg;
+    llmProvidersListEl.querySelectorAll("[data-provider-id]").forEach((card) => {
+      const id = card.getAttribute("data-provider-id");
+      const p = cfg.providers.find((x) => x.id === id);
+      if (!p) return;
+      const nameEl = card.querySelector("[data-field='name']");
+      const urlEl = card.querySelector("[data-field='baseUrl']");
+      const keyEl = card.querySelector("[data-field='apiKey']");
+      if (nameEl) p.name = nameEl.value.trim();
+      if (urlEl) p.baseUrl = urlEl.value.trim();
+      if (keyEl) p.apiKey = keyEl.value.trim();
+    });
+    return cfg;
+  }
+
+  function saveLlmLocalConfig() {
+    const cfg = persistLlmConfig(flushLlmProviderForm(loadLlmLocalConfig()));
     syncLlmConfiguredFromLocal();
     updateLlmButtonState();
-    syncConfigToAgent({ llm: cfg });
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    return cfg;
   }
 
   function getLlmRequestConfig() {
-    const baseUrl =
-      (llmBaseUrlEl && llmBaseUrlEl.value.trim()) ||
-      llmBaseUrlDefault ||
-      LLM_DEFAULT_BASE_URL;
-    const apiKey = (llmApiKeyEl && llmApiKeyEl.value.trim()) || "";
-    const model = getSelectedLlmModel();
-    return { baseUrl, apiKey, model };
+    const cfg = loadLlmLocalConfig();
+    const p = getActiveLlmProvider(cfg);
+    const model =
+      (cfg.model || "").trim() ||
+      (p.models && p.models[0]) ||
+      llmModelDefault ||
+      LLM_DEFAULT_MODEL;
+    return {
+      baseUrl:
+        (p.baseUrl || "").trim() ||
+        llmBaseUrlDefault ||
+        LLM_DEFAULT_BASE_URL,
+      apiKey: (p.apiKey || "").trim(),
+      model,
+    };
   }
 
   function syncLlmConfiguredFromLocal() {
@@ -16894,30 +17041,6 @@
     return (models || []).slice(0, LLM_PICKER_LIMIT);
   }
 
-  function loadUserCustomModels() {
-    const arr = loadJsonLocal(LLM_CUSTOM_MODELS_KEY, []);
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((x) => typeof x === "string" && x.trim())
-      .map((x) => x.trim());
-  }
-
-  function saveUserCustomModels(list) {
-    saveJsonLocal(
-      LLM_CUSTOM_MODELS_KEY,
-      (list || []).filter((x) => typeof x === "string" && x.trim()).slice(0, 30)
-    );
-  }
-
-  function addUserCustomModel(id) {
-    const mid = (id || "").trim();
-    if (!mid || mid === LLM_CUSTOM_SENTINEL) return false;
-    const list = loadUserCustomModels().filter((x) => x !== mid);
-    list.unshift(mid);
-    saveUserCustomModels(list);
-    return true;
-  }
-
   function selectHasValue(selectEl, value) {
     if (!selectEl || !value) return false;
     return Array.prototype.some.call(
@@ -16926,186 +17049,367 @@
     );
   }
 
-  function modelDisplayLabel(m) {
-    if (!m) return "";
-    if (typeof m === "string") return m;
-    const id = (m.id || "").trim();
-    const name = (m.name || "").trim();
-    if (name && name !== id) return name;
-    return id;
+  function llmSelectGroups(cfg) {
+    return (cfg.providers || []).map((p) => ({
+      id: p.id,
+      label: providerDisplayName(p),
+      models: p.models || [],
+    }));
   }
 
-  function fillModelSelect(selectEl, opts) {
+  function fillGroupedModelSelect(selectEl, opts) {
     if (!selectEl) return;
-    const models = topFreeModels(opts.models);
-    const userModels = opts.userModels || [];
-    const includeCustom = !!opts.includeCustom;
-    let selected = (opts.selected || "").trim();
+    const groups = opts.groups || [];
+    const selectedPid = opts.selectedProviderId || "";
+    const selectedModel = (opts.selected || "").trim();
     selectEl.innerHTML = "";
-    models.forEach((m) => {
-      const id = (m && m.id) || "";
-      if (!id) return;
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = modelDisplayLabel(m);
-      selectEl.appendChild(opt);
+    groups.forEach((g) => {
+      if (!g.models || !g.models.length) return;
+      const og = document.createElement("optgroup");
+      og.label = g.label;
+      g.models.forEach((id) => {
+        if (!id) return;
+        const opt = document.createElement("option");
+        opt.value = llmOptionValue(g.id, id);
+        opt.textContent = id;
+        og.appendChild(opt);
+      });
+      if (og.childElementCount) selectEl.appendChild(og);
     });
-    userModels.forEach((id) => {
-      if (!id || selectHasValue(selectEl, id)) return;
+    if (!selectEl.options.length) {
       const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = id;
+      opt.value = "";
+      opt.textContent = t("settings.llmEmptySelect");
       selectEl.appendChild(opt);
-    });
-    if (
-      selected &&
-      selected !== LLM_CUSTOM_SENTINEL &&
-      !selectHasValue(selectEl, selected)
-    ) {
-      const opt = document.createElement("option");
-      opt.value = selected;
-      opt.textContent = selected;
-      selectEl.appendChild(opt);
+      return;
     }
-    if (includeCustom) {
-      const opt = document.createElement("option");
-      opt.value = LLM_CUSTOM_SENTINEL;
-      opt.textContent = t("settings.llmModelCustomOption");
-      selectEl.appendChild(opt);
+    const want =
+      selectedPid && selectedModel
+        ? llmOptionValue(selectedPid, selectedModel)
+        : "";
+    if (want && selectHasValue(selectEl, want)) {
+      selectEl.value = want;
+    } else {
+      selectEl.selectedIndex = 0;
     }
-    if (selected && selectHasValue(selectEl, selected)) {
-      selectEl.value = selected;
-    } else if (selectEl.options.length) {
-      const fallback =
-        (llmModelDefault || "").trim() ||
-        (models[0] && models[0].id) ||
-        "";
-      if (fallback && selectHasValue(selectEl, fallback)) {
-        selectEl.value = fallback;
-      } else {
-        selectEl.selectedIndex = 0;
-      }
-    }
-  }
-
-  function syncCustomModelRowVisibility() {
-    if (!llmModelCustomRow || !llmModelSelectEl) return;
-    const show = llmModelSelectEl.value === LLM_CUSTOM_SENTINEL;
-    llmModelCustomRow.classList.toggle("hidden", !show);
   }
 
   function getSelectedLlmModel() {
-    if (llmModelSelectEl && llmModelSelectEl.value === LLM_CUSTOM_SENTINEL) {
-      return (
-        (llmModelEl && llmModelEl.value.trim()) ||
-        llmModelDefault ||
-        LLM_DEFAULT_MODEL
-      );
-    }
-    if (llmModelSelectEl && llmModelSelectEl.value) {
-      return llmModelSelectEl.value.trim();
-    }
-    return (
-      (llmModelEl && llmModelEl.value.trim()) ||
-      llmModelDefault ||
-      LLM_DEFAULT_MODEL
-    );
-  }
-
-  function syncStoryboardModelSelect() {
-    if (!storyboardLlmModelEl) return;
-    const free = topFreeModels(llmFreeModels);
-    const userModels = llmChannel === "custom" ? loadUserCustomModels() : [];
-    fillModelSelect(storyboardLlmModelEl, {
-      models: free,
-      selected: getSelectedLlmModel(),
-      userModels,
-      includeCustom: false,
-    });
-  }
-
-  function applyModelFromStoryboard() {
-    if (!storyboardLlmModelEl) return;
-    const v = (storyboardLlmModelEl.value || "").trim();
-    if (!v) return;
-    const free = topFreeModels(llmFreeModels);
-    const userModels = loadUserCustomModels();
-    const inList =
-      free.some((m) => m.id === v) || userModels.indexOf(v) >= 0;
-    if (inList && llmModelSelectEl) {
-      llmModelSelectEl.value = v;
-      if (llmModelEl) llmModelEl.value = v;
-    } else {
-      if (llmModelSelectEl) llmModelSelectEl.value = LLM_CUSTOM_SENTINEL;
-      if (llmModelEl) llmModelEl.value = v;
-    }
-    syncCustomModelRowVisibility();
-    saveLlmLocalConfig();
-  }
-
-  function fillLlmConfigInputs(opts) {
-    const local = loadLlmLocalConfig();
-    const baseUrl =
-      (local.baseUrl || "").trim() ||
-      (opts && opts.baseUrl) ||
-      llmBaseUrlDefault ||
-      LLM_DEFAULT_BASE_URL;
-    if (llmBaseUrlEl) llmBaseUrlEl.value = baseUrl;
-    if (llmApiKeyEl) llmApiKeyEl.value = (local.apiKey || "").trim();
-    if (llmModelEl) {
-      const model =
-        (local.model || "").trim() ||
-        (opts && opts.model) ||
-        llmModelDefault ||
-        LLM_DEFAULT_MODEL;
-      llmModelEl.value = model;
-    }
-    populateLlmModelSelects(llmFreeModels);
-    syncLlmConfiguredFromLocal();
+    const cfg = getLlmRequestConfig();
+    return cfg.model || llmModelDefault || LLM_DEFAULT_MODEL;
   }
 
   function populateLlmModelSelects(models) {
     if (Array.isArray(models)) llmFreeModels = models;
-    const free = topFreeModels(llmFreeModels);
-    const userModels = loadUserCustomModels();
-    const local = loadLlmLocalConfig();
-    const customStored =
-      (local.model || "").trim() ||
-      (llmModelEl && llmModelEl.value.trim()) ||
-      llmModelDefault ||
-      "";
-    const inCatalog =
-      free.some((m) => m.id === customStored) ||
-      userModels.indexOf(customStored) >= 0;
-    const customSelectVal = inCatalog
-      ? customStored
-      : customStored
-        ? LLM_CUSTOM_SENTINEL
-        : (free[0] && free[0].id) || LLM_CUSTOM_SENTINEL;
-    fillModelSelect(llmModelSelectEl, {
-      models: free,
-      selected: customSelectVal,
-      userModels,
-      includeCustom: true,
-    });
-    if (llmModelEl) {
-      if (customSelectVal === LLM_CUSTOM_SENTINEL) {
-        llmModelEl.value = customStored || llmModelEl.value || "";
-      } else {
-        llmModelEl.value = customSelectVal;
-      }
-    }
-    syncCustomModelRowVisibility();
-    syncStoryboardModelSelect();
+    const cfg = loadLlmLocalConfig();
+    const args = {
+      groups: llmSelectGroups(cfg),
+      selected: cfg.model,
+      selectedProviderId: cfg.activeProviderId,
+    };
+    fillGroupedModelSelect(llmActiveSelectEl, args);
+    fillGroupedModelSelect(storyboardLlmModelEl, args);
+    fillGroupedModelSelect(scriptLlmModelEl, args);
   }
 
   function populateLlmModelSuggestions(models) {
     populateLlmModelSelects(models);
+    renderLlmProvidersUi();
   }
 
-  async function refreshLlmFreeModels() {
+  function applyModelFromSelect(selectEl) {
+    if (!selectEl) return;
+    const parsed = parseLlmOptionValue(selectEl.value);
+    if (!parsed.modelId) return;
+    setActiveLlmSelection(parsed.providerId, parsed.modelId, {
+      render: true,
+    });
+  }
+
+  function setActiveLlmSelection(providerId, model, opts) {
+    const cfg = loadLlmLocalConfig();
+    if (providerId && cfg.providers.some((p) => p.id === providerId)) {
+      cfg.activeProviderId = providerId;
+    }
+    const p = getActiveLlmProvider(cfg);
+    const mid = (model || "").trim();
+    if (mid && p.models.indexOf(mid) >= 0) {
+      cfg.model = mid;
+    } else if (mid && opts && opts.addIfMissing) {
+      p.models.unshift(mid);
+      p.models = uniqueTrimmed(p.models, LLM_MODELS_PER_PROVIDER);
+      cfg.model = mid;
+    } else {
+      cfg.model = p.models[0] || "";
+    }
+    persistLlmConfig(cfg);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    populateLlmModelSelects();
+    if (!opts || opts.render !== false) renderLlmProvidersUi();
+  }
+
+  function showLlmAddProviderForm(show) {
+    if (!llmAddProviderFormEl) return;
+    llmAddProviderFormEl.classList.toggle("hidden", !show);
+    if (show) {
+      if (llmNewProviderNameEl) llmNewProviderNameEl.value = "";
+      if (llmNewProviderUrlEl) {
+        llmNewProviderUrlEl.value = "";
+        llmNewProviderUrlEl.focus();
+      }
+      if (llmNewProviderKeyEl) llmNewProviderKeyEl.value = "";
+      if (llmNewProviderModelEl) llmNewProviderModelEl.value = "";
+    }
+  }
+
+  function addLlmProviderFromForm() {
+    const baseUrl = llmNewProviderUrlEl
+      ? llmNewProviderUrlEl.value.trim()
+      : "";
+    if (!baseUrl) {
+      alert(t("settings.llmUrlRequired"));
+      return;
+    }
+    const cfg = loadLlmLocalConfig();
+    if (cfg.providers.length >= LLM_PROVIDERS_MAX) {
+      alert(t("settings.llmProvidersMax"));
+      return;
+    }
+    const model = llmNewProviderModelEl
+      ? llmNewProviderModelEl.value.trim()
+      : "";
+    const p = {
+      id: newLlmProviderId(),
+      name:
+        (llmNewProviderNameEl && llmNewProviderNameEl.value.trim()) ||
+        hostnameLabel(baseUrl),
+      baseUrl,
+      apiKey: llmNewProviderKeyEl ? llmNewProviderKeyEl.value.trim() : "",
+      models: model ? [model] : [],
+    };
+    cfg.providers.push(p);
+    cfg.activeProviderId = p.id;
+    if (model) cfg.model = model;
+    persistLlmConfig(cfg);
+    llmEditingProviderId = p.id;
+    showLlmAddProviderForm(false);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    populateLlmModelSelects();
+    renderLlmProvidersUi();
+  }
+
+  function deleteLlmProvider(id) {
+    const cfg = loadLlmLocalConfig();
+    if (cfg.providers.length <= 1) {
+      alert(t("settings.llmNeedOneProvider"));
+      return;
+    }
+    const p = cfg.providers.find((x) => x.id === id);
+    const name = providerDisplayName(p);
+    if (!confirm(t("settings.llmDeleteProviderConfirm", { name }))) return;
+    cfg.providers = cfg.providers.filter((x) => x.id !== id);
+    if (cfg.activeProviderId === id) {
+      cfg.activeProviderId = cfg.providers[0].id;
+      cfg.model = cfg.providers[0].models[0] || cfg.model;
+    }
+    if (llmEditingProviderId === id) llmEditingProviderId = "";
+    persistLlmConfig(cfg);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    populateLlmModelSelects();
+    renderLlmProvidersUi();
+  }
+
+  function addModelToProvider(id, modelId) {
+    const mid = (modelId || "").trim();
+    if (!mid) {
+      alert(t("settings.llmAddModelEmpty"));
+      return false;
+    }
+    const cfg = loadLlmLocalConfig();
+    const p = cfg.providers.find((x) => x.id === id);
+    if (!p) return false;
+    p.models = uniqueTrimmed([mid].concat(p.models), LLM_MODELS_PER_PROVIDER);
+    if (cfg.activeProviderId === id) cfg.model = mid;
+    persistLlmConfig(cfg);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    populateLlmModelSelects();
+    renderLlmProvidersUi();
+    const input = llmProvidersListEl
+      ? llmProvidersListEl.querySelector(
+          `[data-provider-id="${id}"] [data-act="new-model"]`
+        )
+      : null;
+    if (input) input.focus();
+    return true;
+  }
+
+  function removeModelFromProvider(id, modelId) {
+    const cfg = loadLlmLocalConfig();
+    const p = cfg.providers.find((x) => x.id === id);
+    if (!p) return;
+    p.models = p.models.filter((m) => m !== modelId);
+    if (cfg.activeProviderId === id && cfg.model === modelId) {
+      cfg.model = p.models[0] || "";
+    }
+    persistLlmConfig(cfg);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    syncConfigToAgent({ llm: getLlmRequestConfig() });
+    populateLlmModelSelects();
+    renderLlmProvidersUi();
+  }
+
+  function patchLlmProviderFields(id) {
+    const cfg = flushLlmProviderForm(loadLlmLocalConfig());
+    persistLlmConfig(cfg);
+    syncLlmConfiguredFromLocal();
+    updateLlmButtonState();
+    const active = getActiveLlmProvider(cfg);
+    if (active && active.id === id) {
+      syncConfigToAgent({ llm: getLlmRequestConfig() });
+    }
+    populateLlmModelSelects();
+  }
+
+  function renderLlmProvidersUi() {
+    if (!llmProvidersListEl) return;
+    const cfg = loadLlmLocalConfig();
+    if (!cfg.providers.length) {
+      llmProvidersListEl.innerHTML =
+        '<p class="muted llm-providers-empty">' +
+        escapeHtml(t("settings.llmNoProviders")) +
+        "</p>";
+      return;
+    }
+    llmProvidersListEl.innerHTML = cfg.providers
+      .map((p) => {
+        const active = p.id === cfg.activeProviderId;
+        const open = p.id === llmEditingProviderId;
+        const name = providerDisplayName(p);
+        const keyOk = !!(p.apiKey && p.apiKey.trim());
+        const chips = (p.models || [])
+          .map((mid) => {
+            const current = active && cfg.model === mid;
+            return `<span class="llm-model-chip${
+              current ? " is-current" : ""
+            }" title="${escapeHtml(mid)}">
+              <button type="button" class="llm-chip-pick" data-act="use-model" data-model="${escapeHtml(
+                mid
+              )}">
+                <span class="llm-model-chip-id">${escapeHtml(mid)}</span>
+              </button>
+              <button type="button" class="llm-model-chip-remove" data-act="remove-model" data-model="${escapeHtml(
+                mid
+              )}" aria-label="${escapeHtml(t("common.delete"))}">×</button>
+            </span>`;
+          })
+          .join("");
+        const showPopular =
+          isOpenRouterUrl(p.baseUrl) || !p.baseUrl;
+        return `<article class="llm-provider-card${active ? " is-active" : ""}${
+          open ? " is-open" : ""
+        }" data-provider-id="${escapeHtml(p.id)}">
+          <div class="llm-provider-head">
+            <input type="radio" class="llm-provider-radio" name="llmActiveProvider" value="${escapeHtml(
+              p.id
+            )}" ${active ? "checked" : ""} data-act="activate" />
+            <div class="llm-provider-titles" data-act="toggle">
+              <span class="llm-provider-name">${escapeHtml(name)}</span>
+              <span class="llm-provider-meta">${escapeHtml(
+                p.baseUrl || t("settings.llmBaseUrlPlaceholder")
+              )}</span>
+              <span class="llm-provider-badges">
+                <span class="llm-provider-badge ${
+                  keyOk ? "is-ok" : "is-warn"
+                }">${escapeHtml(
+          keyOk ? t("settings.llmKeyReady") : t("settings.llmKeyMissing")
+        )}</span>
+                <span class="llm-provider-badge">${escapeHtml(
+                  p.models.length
+                    ? t("settings.llmModelCount", { n: p.models.length })
+                    : t("settings.llmNoModels")
+                )}</span>
+              </span>
+            </div>
+            <div class="llm-provider-head-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-act="delete">${escapeHtml(
+                t("common.delete")
+              )}</button>
+            </div>
+          </div>
+          <div class="llm-provider-body">
+            <label class="field-label muted">${escapeHtml(
+              t("settings.llmProviderName")
+            )}</label>
+            <input type="text" class="llm-config-input" data-field="name" value="${escapeHtml(
+              p.name
+            )}" autocomplete="off" spellcheck="false" />
+            <label class="field-label muted">${escapeHtml(
+              t("settings.llmBaseUrl")
+            )}</label>
+            <input type="url" class="llm-config-input" data-field="baseUrl" value="${escapeHtml(
+              p.baseUrl
+            )}" placeholder="${escapeHtml(
+          t("settings.llmBaseUrlPlaceholder")
+        )}" autocomplete="off" spellcheck="false" />
+            <label class="field-label muted">${escapeHtml(
+              t("settings.llmApiKey")
+            )}</label>
+            <input type="password" class="llm-config-input" data-field="apiKey" value="${escapeHtml(
+              p.apiKey
+            )}" placeholder="${escapeHtml(
+          t("settings.llmApiKeyPlaceholder")
+        )}" autocomplete="off" spellcheck="false" />
+            <label class="field-label muted">${escapeHtml(
+              t("settings.llmModel")
+            )}</label>
+            <div class="llm-model-chips">${
+              chips ||
+              `<span class="muted">${escapeHtml(
+                t("settings.llmNoModels")
+              )}</span>`
+            }</div>
+            <div class="row gap llm-add-model-row">
+              <input type="text" class="llm-config-input llm-model-input" data-act="new-model" placeholder="${escapeHtml(
+                t("settings.llmModelPlaceholder")
+              )}" autocomplete="off" spellcheck="false" />
+              <button type="button" class="btn btn-ghost btn-sm" data-act="add-model">${escapeHtml(
+                t("settings.llmAddModel")
+              )}</button>
+              ${
+                showPopular
+                  ? `<button type="button" class="btn btn-ghost btn-sm" data-act="fill-popular" title="${escapeHtml(
+                      t("settings.llmRefreshModelsTitle")
+                    )}">${escapeHtml(t("settings.llmFillPopular"))}</button>`
+                  : ""
+              }
+            </div>
+          </div>
+        </article>`;
+      })
+      .join("");
+  }
+
+  function fillLlmConfigInputs() {
+    const cfg = loadLlmLocalConfig();
+    if (!llmEditingProviderId && cfg.providers && cfg.providers.length) {
+      llmEditingProviderId = cfg.activeProviderId || cfg.providers[0].id;
+    }
+    populateLlmModelSelects();
+    renderLlmProvidersUi();
+    syncLlmConfiguredFromLocal();
+  }
+
+  async function refreshLlmFreeModels(providerId) {
     try {
-      const prevSelected = getSelectedLlmModel();
       const res = await fetch("/api/llm/models?refresh=1", {
         credentials: "same-origin",
       });
@@ -17120,33 +17424,24 @@
       if (json.data.defaultModel) {
         llmModelDefault = json.data.defaultModel;
       }
-      const free = topFreeModels(llmFreeModels);
-      const freeIds = free.map((m) => m.id);
-      const local = loadLlmLocalConfig();
-      const userModels = loadUserCustomModels();
-      const keep =
-        prevSelected &&
-        (freeIds.indexOf(prevSelected) >= 0 ||
-          userModels.indexOf(prevSelected) >= 0)
-          ? prevSelected
-          : prevSelected ||
-            llmModelDefault ||
-            (free[0] && free[0].id) ||
-            "";
-      if (keep && freeIds.indexOf(keep) < 0 && userModels.indexOf(keep) < 0) {
-        if (llmModelSelectEl) llmModelSelectEl.value = LLM_CUSTOM_SENTINEL;
-        if (llmModelEl) llmModelEl.value = keep;
-      } else if (llmModelEl && keep) {
-        llmModelEl.value = keep;
+      const ids = topFreeModels(llmFreeModels)
+        .map((m) => (m && m.id) || "")
+        .filter(Boolean);
+      const cfg = loadLlmLocalConfig();
+      const orProv = cfg.providers.find((x) => isOpenRouterUrl(x.baseUrl));
+      const pid = providerId || (orProv && orProv.id) || cfg.activeProviderId;
+      const p = cfg.providers.find((x) => x.id === pid);
+      if (p && ids.length) {
+        p.models = uniqueTrimmed(p.models.concat(ids), LLM_MODELS_PER_PROVIDER);
+        if (!p.baseUrl) p.baseUrl = llmBaseUrlDefault || LLM_DEFAULT_BASE_URL;
+        if (!cfg.model && p.models[0]) cfg.model = p.models[0];
+        persistLlmConfig(cfg);
       }
-      if (!(local.baseUrl || "").trim() && llmBaseUrlEl) {
-        llmBaseUrlEl.value = llmBaseUrlDefault;
-      }
-      populateLlmModelSelects(llmFreeModels);
+      populateLlmModelSelects();
+      renderLlmProvidersUi();
       saveLlmLocalConfig();
-      openSettingsModal("llm");
       if (llmStatus) {
-        llmStatus.textContent = llmFreeModels.length
+        llmStatus.textContent = ids.length
           ? t("settings.modelsUpdated", {
               model: getSelectedLlmModel() || llmModelDefault,
             })
@@ -19667,79 +19962,112 @@
       });
     });
   }
-  if (llmBaseUrlEl) {
-    llmBaseUrlEl.addEventListener("change", saveLlmLocalConfig);
-    llmBaseUrlEl.addEventListener("blur", saveLlmLocalConfig);
+  function llmProviderIdFromEvent(ev) {
+    const card = ev.target && ev.target.closest("[data-provider-id]");
+    return card ? card.getAttribute("data-provider-id") : "";
   }
-  if (llmApiKeyEl) {
-    llmApiKeyEl.addEventListener("change", saveLlmLocalConfig);
-    llmApiKeyEl.addEventListener("blur", saveLlmLocalConfig);
-    llmApiKeyEl.addEventListener("input", () => {
-      syncLlmConfiguredFromLocal();
-      updateLlmButtonState();
-    });
-  }
-  if (llmModelEl) {
-    llmModelEl.addEventListener("change", () => {
-      saveLlmLocalConfig();
-      syncStoryboardModelSelect();
-    });
-    llmModelEl.addEventListener("blur", () => {
-      saveLlmLocalConfig();
-      syncStoryboardModelSelect();
-    });
-  }
-  if (llmModelSelectEl) {
-    llmModelSelectEl.addEventListener("change", () => {
-      syncCustomModelRowVisibility();
-      if (
-        llmModelSelectEl.value !== LLM_CUSTOM_SENTINEL &&
-        llmModelEl
-      ) {
-        llmModelEl.value = llmModelSelectEl.value;
-      }
-      saveLlmLocalConfig();
-      syncStoryboardModelSelect();
-    });
-  }
-  if (llmPlatformModelEl) {
-    llmPlatformModelEl.addEventListener("change", () => {
-      saveLlmLocalConfig();
-      syncStoryboardModelSelect();
+
+  if (llmActiveSelectEl) {
+    llmActiveSelectEl.addEventListener("change", () => {
+      applyModelFromSelect(llmActiveSelectEl);
     });
   }
   if (storyboardLlmModelEl) {
     storyboardLlmModelEl.addEventListener("change", () => {
-      applyModelFromStoryboard();
+      applyModelFromSelect(storyboardLlmModelEl);
     });
   }
-  if (btnLlmAddCustomModel) {
-    btnLlmAddCustomModel.addEventListener("click", () => {
-      const id = llmModelEl ? llmModelEl.value.trim() : "";
-      if (!id) {
-        alert(t("settings.llmAddModelEmpty"));
+  if (scriptLlmModelEl) {
+    scriptLlmModelEl.addEventListener("change", () => {
+      applyModelFromSelect(scriptLlmModelEl);
+    });
+  }
+  if (btnLlmAddProvider) {
+    btnLlmAddProvider.addEventListener("click", () => {
+      const showing =
+        llmAddProviderFormEl &&
+        !llmAddProviderFormEl.classList.contains("hidden");
+      showLlmAddProviderForm(!showing);
+    });
+  }
+  if (btnLlmSaveProvider) {
+    btnLlmSaveProvider.addEventListener("click", () => {
+      addLlmProviderFromForm();
+    });
+  }
+  if (btnLlmCancelProvider) {
+    btnLlmCancelProvider.addEventListener("click", () => {
+      showLlmAddProviderForm(false);
+    });
+  }
+  if (llmProvidersListEl) {
+    llmProvidersListEl.addEventListener("click", (ev) => {
+      const actEl = ev.target.closest("[data-act]");
+      const id = llmProviderIdFromEvent(ev);
+      if (!id || !actEl) return;
+      const act = actEl.getAttribute("data-act");
+      if (act === "delete") {
+        ev.preventDefault();
+        deleteLlmProvider(id);
         return;
       }
-      addUserCustomModel(id);
-      if (llmModelSelectEl) {
-        // Select the newly added id (not sentinel)
-        populateLlmModelSelects(llmFreeModels);
-        llmModelSelectEl.value = id;
-        if (llmModelEl) llmModelEl.value = id;
-        syncCustomModelRowVisibility();
+      if (act === "activate") {
+        const cfg = loadLlmLocalConfig();
+        const p = cfg.providers.find((x) => x.id === id);
+        const keep =
+          cfg.activeProviderId === id
+            ? cfg.model
+            : (p && p.models[0]) || "";
+        setActiveLlmSelection(id, keep);
+        return;
       }
-      saveLlmLocalConfig();
-      syncStoryboardModelSelect();
+      if (act === "toggle") {
+        llmEditingProviderId = llmEditingProviderId === id ? "" : id;
+        renderLlmProvidersUi();
+        return;
+      }
+      if (act === "add-model") {
+        const card = actEl.closest("[data-provider-id]");
+        const input = card && card.querySelector("[data-act='new-model']");
+        addModelToProvider(id, input && input.value);
+        return;
+      }
+      if (act === "remove-model") {
+        removeModelFromProvider(id, actEl.getAttribute("data-model"));
+        return;
+      }
+      if (act === "use-model") {
+        setActiveLlmSelection(id, actEl.getAttribute("data-model"));
+        return;
+      }
+      if (act === "fill-popular") {
+        refreshLlmFreeModels(id);
+      }
     });
-  }
-  if (btnLlmRefreshModels) {
-    btnLlmRefreshModels.addEventListener("click", () => {
-      refreshLlmFreeModels();
+    llmProvidersListEl.addEventListener("change", (ev) => {
+      const field = ev.target.getAttribute("data-field");
+      const id = llmProviderIdFromEvent(ev);
+      if (!field || !id) return;
+      patchLlmProviderFields(id);
+      renderLlmProvidersUi();
     });
-  }
-  if (btnLlmRefreshModelsPlatform) {
-    btnLlmRefreshModelsPlatform.addEventListener("click", () => {
-      refreshLlmFreeModels();
+    llmProvidersListEl.addEventListener(
+      "blur",
+      (ev) => {
+        const field =
+          ev.target && ev.target.getAttribute
+            ? ev.target.getAttribute("data-field")
+            : "";
+        const id = llmProviderIdFromEvent(ev);
+        if (field && id) patchLlmProviderFields(id);
+      },
+      true
+    );
+    llmProvidersListEl.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      if (ev.target.getAttribute("data-act") !== "new-model") return;
+      ev.preventDefault();
+      addModelToProvider(llmProviderIdFromEvent(ev), ev.target.value);
     });
   }
 
@@ -21083,6 +21411,8 @@
       renderWorkflowTables();
     } catch (e) {}
     try {
+      populateLlmModelSelects();
+      renderLlmProvidersUi();
       updateLlmButtonState();
     } catch (e) {}
     try {

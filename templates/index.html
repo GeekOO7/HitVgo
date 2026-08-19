@@ -658,22 +658,36 @@
         </section>
 
         <section id="settingsTabLlm" class="settings-pane hidden" data-pane="llm">
-          <p class="muted settings-lead" data-i18n="settings.llmLead">经本机助手转发 OpenAI 兼容接口，Key 留在本机、不经过本站服务器。</p>
+          <p class="muted settings-lead" data-i18n="settings.llmLead">经本机助手转发 OpenAI 兼容接口，Key 留在本机、不经过本站服务器。可添加多个 API 地址，每个渠道手填若干模型。</p>
 
           <div id="llmChannelCustom" class="channel-panel">
-            <label class="field-label muted" for="llmBaseUrl" data-i18n="settings.llmBaseUrl">API 地址</label>
-            <input type="url" id="llmBaseUrl" class="llm-config-input" data-i18n-placeholder="settings.llmBaseUrlPlaceholder" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
-            <label class="field-label muted" for="llmApiKey" data-i18n="settings.llmApiKey">API Key</label>
-            <input type="password" id="llmApiKey" class="llm-config-input" data-i18n-placeholder="settings.llmApiKeyPlaceholder" placeholder="sk-or-…" autocomplete="off" spellcheck="false" />
-            <label class="field-label muted" for="llmModelSelect" data-i18n="settings.llmModel">模型</label>
-            <div class="row gap llm-model-row">
-              <select id="llmModelSelect" class="llm-config-input llm-model-select"></select>
-              <button type="button" id="btnLlmRefreshModels" class="btn btn-ghost btn-sm" data-i18n="settings.llmRefreshModels" data-i18n-title="settings.llmRefreshModelsTitle" title="刷新 OpenRouter 周排行免费模型">刷新热门</button>
+            <label class="field-label muted" for="llmActiveSelect" data-i18n="settings.llmActive">当前使用</label>
+            <select id="llmActiveSelect" class="llm-config-input llm-model-select"></select>
+            <p class="muted settings-howto-inline" data-i18n="settings.llmActiveHint">分镜、剧本与识别都会走这里选中的渠道与模型。</p>
+
+            <div class="workflow-section-head llm-providers-head">
+              <h4 class="settings-subhead" data-i18n="settings.llmProviders">API 渠道</h4>
+              <button type="button" id="btnLlmAddProvider" class="btn btn-primary btn-sm" data-i18n="settings.llmAddProvider">添加渠道</button>
             </div>
-            <div class="row gap llm-model-custom-row hidden" id="llmModelCustomRow">
-              <input type="text" id="llmModel" class="llm-config-input llm-model-input" data-i18n-placeholder="settings.llmModelPlaceholder" placeholder="nvidia/nemotron-3-ultra-550b-a55b:free" autocomplete="off" spellcheck="false" />
-              <button type="button" id="btnLlmAddCustomModel" class="btn btn-ghost btn-sm" data-i18n="settings.llmAddModel">添加</button>
+            <p class="muted settings-howto-inline" data-i18n="settings.llmProvidersLead">一份地址对应一套 Key；模型 ID 需手动添加（或对 OpenRouter 填入热门免费模型）。点卡片可展开编辑。</p>
+
+            <div id="llmAddProviderForm" class="llm-add-provider-form hidden">
+              <label class="field-label muted" for="llmNewProviderName" data-i18n="settings.llmProviderName">名称</label>
+              <input type="text" id="llmNewProviderName" class="llm-config-input" data-i18n-placeholder="settings.llmProviderNamePlaceholder" placeholder="如 OpenRouter、Ollama" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="llmNewProviderUrl" data-i18n="settings.llmBaseUrl">API 地址</label>
+              <input type="url" id="llmNewProviderUrl" class="llm-config-input" data-i18n-placeholder="settings.llmBaseUrlPlaceholder" placeholder="https://openrouter.ai/api/v1" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="llmNewProviderKey" data-i18n="settings.llmApiKey">API Key</label>
+              <input type="password" id="llmNewProviderKey" class="llm-config-input" data-i18n-placeholder="settings.llmApiKeyPlaceholder" placeholder="sk-or-…" autocomplete="off" spellcheck="false" />
+              <label class="field-label muted" for="llmNewProviderModel" data-i18n="settings.llmModel">模型 ID</label>
+              <input type="text" id="llmNewProviderModel" class="llm-config-input" data-i18n-placeholder="settings.llmModelPlaceholder" placeholder="nvidia/nemotron-3-ultra-550b-a55b:free" autocomplete="off" spellcheck="false" />
+              <div class="row gap" style="margin-top:0.35rem">
+                <button type="button" id="btnLlmSaveProvider" class="btn btn-primary btn-sm" data-i18n="settings.llmSaveProvider">保存渠道</button>
+                <button type="button" id="btnLlmCancelProvider" class="btn btn-ghost btn-sm" data-i18n="common.cancel">取消</button>
+              </div>
             </div>
+
+            <div id="llmProvidersList" class="llm-providers-list"></div>
+
             <p class="muted llm-config-tip" data-i18n="settings.llmTip">Key 经本机助手转发，不经过本站服务器。请先启动助手并检测连接。</p>
             <button type="button" class="btn btn-ghost btn-sm" data-goto-settings-tab="agent" data-i18n="settings.gotoAgent">去「本机助手」…</button>
           </div>
@@ -682,14 +696,14 @@
         <section id="settingsTabAgent" class="settings-pane hidden" data-pane="agent">
           <div id="localAgentPanel" class="local-agent-panel">
             <strong class="local-agent-title" data-i18n="agent.panelTitle">本机助手</strong>
-            <p class="muted settings-howto-inline" data-i18n-html="agent.panelLeadHtml">自定义渠道由<strong>本机助手</strong>发起任务（不再浏览器直连第三方），请先下载并启动助手。</p>
+            <p class="muted settings-howto-inline" data-i18n-html="agent.panelLeadHtml">自定义渠道由<strong>本机助手</strong>发起任务（不再浏览器直连第三方），请先从 GitHub 获取本项目并启动助手。</p>
             <ol class="settings-howto-list agent-steps">
-              <li data-i18n-html="agent.step1Html">点击下方<strong>下载本机助手</strong>，解压到任意文件夹。</li>
+              <li data-i18n-html="agent.step1Html">前往本项目 <strong>GitHub 仓库</strong>，克隆后在 <code>local_agent</code> 目录启动助手。</li>
               <li data-i18n-html="agent.step2Html">双击 <code>start.bat</code>，保持黑窗口开启；看到「已就绪」即可。</li>
               <li data-i18n-html="agent.step3Html">回到本页点击<strong>检测连接</strong>，绿灯后即可填写渠道并生成。</li>
             </ol>
             <div class="row gap agent-actions">
-              <a class="btn btn-primary btn-sm" id="btnAgentDownload" href="/static/agent/vflow-local-agent.zip" download data-i18n="agent.download">下载本机助手</a>
+              <a class="btn btn-primary btn-sm" id="btnAgentGithub" href="https://github.com/GeekOO7/HitVgo" target="_blank" rel="noopener" data-i18n="agent.github">GitHub 仓库</a>
               <button type="button" id="btnAgentCheck" class="btn btn-ghost btn-sm" data-i18n="agent.check">检测连接</button>
               <button type="button" id="btnAgentCopyCmd" class="btn btn-ghost btn-sm" data-i18n="agent.copyCmd">复制启动命令</button>
               <span id="agentCheckStatus" class="muted"></span>
