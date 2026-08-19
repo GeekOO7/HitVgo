@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="page.title">{{ site_seo.title or site_ui.pageTitle or 'HitVgo · 影高 — AI 视频创作平台' }}</title>
+  <meta name="author" content="Geek007" />
   <meta name="description" content="{{ site_seo.description or '' }}" />
   <meta name="keywords" content="{{ site_seo.keywords or '' }}" />
   <meta property="og:type" content="website" />
@@ -25,6 +26,7 @@
     <header class="editor-topbar">
       <div class="topbar-brand">
         <h1 data-brand>{{ site_ui.brandName or 'HitVgo · 影高' }}</h1>
+        <a class="topbar-author muted" href="https://hitvgo.geek007.com" target="_blank" rel="noopener" data-i18n="brand.author">by Geek007</a>
         <span id="draftStatus" class="draft-status muted" aria-live="polite"></span>
       </div>
       <nav class="phase-steps" data-i18n-aria-label="phase.ariaLabel" aria-label="工作阶段">
@@ -753,6 +755,16 @@
                 <option value="2">2</option>
               </select>
             </label>
+          </div>
+          <div class="settings-about" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+            <strong data-i18n="about.title">关于 HitVgo · 影高</strong>
+            <p class="muted" style="margin:0.35rem 0" data-i18n="about.desc">本机 AI 视频创作界面，对接你自己的 RunningHub / ComfyUI 工作流，LLM 自动绑定参数，分镜写词、批量生成与时间轴剪接。所有 Key 留在本机。</p>
+            <p class="muted" style="margin:0.35rem 0">
+              <span data-i18n="about.author">作者：Geek007</span> ·
+              <a href="https://hitvgo.geek007.com" target="_blank" rel="noopener" data-i18n="about.site">官方站点</a> ·
+              <a href="https://github.com/GeekOO7/HitVgo" target="_blank" rel="noopener">GitHub</a> ·
+              AGPL-3.0
+            </p>
           </div>
         </section>
       </div>

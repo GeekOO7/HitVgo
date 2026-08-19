@@ -46,14 +46,14 @@ def defaults() -> dict:
             "seo": {
                 "title": "HitVgo · 影高 — AI 视频创作平台 | ComfyUI 工作流聚合",
                 "description": (
-                    "聚合 ComfyUI 工作流的 AI 视频创作平台，免去繁琐工作流配置，"
-                    "快速生成、审视结果并剪接成片。"
+                    "Geek007 开发的本机 AI 视频创作界面，对接你自己的 ComfyUI / RunningHub 工作流，"
+                    "LLM 自动绑定参数，分镜写词、批量生成与时间轴剪接。"
                 ),
                 "keywords": (
-                    "AI视频,ComfyUI,图生视频,视频剪辑,工作流,AI创作,HitVgo,影高"
+                    "AI视频,ComfyUI,图生视频,视频剪辑,工作流,AI创作,HitVgo,影高,Geek007"
                 ),
                 "ogTitle": "HitVgo · 影高 — AI 视频创作平台",
-                "ogDescription": "聚合 ComfyUI 工作流，免配置快速生成与剪接。",
+                "ogDescription": "Geek007 出品——对接你自己的 ComfyUI 工作流，快速生成与剪接。",
                 "ogImage": "",
             },
         },
@@ -68,15 +68,15 @@ def defaults() -> dict:
             "seo": {
                 "title": "HitVgo — AI Video Creation Platform | ComfyUI Workflow Hub",
                 "description": (
-                    "An AI video creation platform that aggregates ComfyUI workflows—"
-                    "skip tedious setup, generate, review results, and edit video fast."
+                    "A local AI video creation UI by Geek007 — connect your own ComfyUI / RunningHub workflows, "
+                    "auto-bind with LLM, storyboard, batch-generate, and edit on a timeline."
                 ),
                 "keywords": (
-                    "AI video,ComfyUI,image to video,video editing,workflow,HitVgo"
+                    "AI video,ComfyUI,image to video,video editing,workflow,HitVgo,Geek007"
                 ),
                 "ogTitle": "HitVgo — AI Video Creation Platform",
                 "ogDescription": (
-                    "Aggregate ComfyUI workflows; skip setup; generate, review, and edit fast."
+                    "By Geek007 — connect your own ComfyUI workflows; generate, review, and edit fast."
                 ),
                 "ogImage": "",
             },

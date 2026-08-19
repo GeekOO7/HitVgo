@@ -39,6 +39,7 @@ if errorlevel 1 (
 
 echo.
 echo Starting HitVgo local agent...
+echo Author: Geek007  https://hitvgo.geek007.com
 echo Listening on 0.0.0.0:39281 (all interfaces). Local: http://127.0.0.1:39281
 echo After ready, go back to the website and click "Check connection".
 echo.
