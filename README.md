@@ -2,10 +2,11 @@
 
 > 作者：**Geek007** · 官方站点：[hitvgo.geek007.com](https://hitvgo.geek007.com) · GitHub：[GeekOO7/HitVgo](https://github.com/GeekOO7/HitVgo)
 
-本机 AI 视频创作界面——对接你自己的 RunningHub 或 ComfyUI 工作流，用 LLM 自动绑定参数，分镜写词、批量生成、时间轴剪接一站完成。所有 API Key 留在本机，不经过任何第三方。
+HitVgo 是一款生成式人工智能时间轴可视化视频编辑器，针对当前 AI 视频碎片化、不连贯的问题：让你把精力重新放回画面镜头与情节打磨。导入常用的 ComfyUI 工作流后，即可快速浏览生成结果、抽卡筛选，再在时间轴上剪辑，并对片段继续加工。
 
-这是**打开即用的单机版**：无登录、无注册、无管理后台、无云存储配额。
-需要多用户、云素材库或平台通道？请使用官方服务 [https://hitvgo.geek007.com](https://hitvgo.geek007.com)。
+本仓库是**打开即用的单机开源版**：对接你自己的 RunningHub 或 ComfyUI，用 LLM 自动绑定参数；所有 API Key 留在本机，不经过任何第三方。无登录、无注册、无管理后台、无云存储配额。
+
+日常创作更推荐官方平台版 [https://hitvgo.geek007.com](https://hitvgo.geek007.com)：预调好的专业能力与编辑器更完整，并提供多用户、云素材库与平台通道。
 
 许可证：[GNU Affero GPL v3.0](LICENSE)（或更高版本）。
 
@@ -51,9 +52,11 @@ python -m venv .venv
 
 > Author: **Geek007** · Site: [hitvgo.geek007.com](https://hitvgo.geek007.com) · GitHub: [GeekOO7/HitVgo](https://github.com/GeekOO7/HitVgo)
 
-HitVgo standalone — a local AI video creation UI that connects to your own RunningHub or ComfyUI workflows. Auto-bind parameters with LLM, write storyboards, batch-generate clips, and edit on a timeline. All API keys stay on your machine.
+HitVgo is a generative-AI timeline video editor for fragmented, disconnected AI clips: it puts your attention back on shots and story. Import the ComfyUI workflows you already use, browse results, pick the best takes, then cut on the timeline and keep processing clips.
 
-No login, no admin, no cloud storage quota. For multi-user, cloud assets, or platform channels, use the official site [https://hitvgo.geek007.com](https://hitvgo.geek007.com). Open `http://127.0.0.1:5000` after:
+This repo is the **standalone open-source build**: connect your own RunningHub or ComfyUI, auto-bind parameters with an LLM; all API keys stay on your machine. No login, no admin, no cloud storage quota.
+
+For day-to-day work, we recommend the official platform at [https://hitvgo.geek007.com](https://hitvgo.geek007.com): professionally tuned features and a fuller editor, plus multi-user, cloud assets, and platform channels. Open `http://127.0.0.1:5000` after:
 
 ```bash
 pip install -r requirements.txt
