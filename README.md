@@ -40,27 +40,46 @@ python -m venv .venv
 
 默认监听 `0.0.0.0:39281`（本机 `http://127.0.0.1:39281`）。回到网页设置里检测连接。
 
-## 仓库里不会出现的内容
-
-密钥与运行时数据已忽略：`key.txt`、`llm_key.txt`、`session_secret.txt`、`data/`、`decoded/`。ComfyUI 工作流参考目录 `wf/` 也不入库。
-
-网络上提供修改版时，AGPL 要求向用户提供对应源码。
-
 ---
 
 ## English
 
 > Author: **Geek007** · Site: [hitvgo.geek007.com](https://hitvgo.geek007.com) · GitHub: [GeekOO7/HitVgo](https://github.com/GeekOO7/HitVgo)
 
-HitVgo is a generative-AI timeline video editor for fragmented, disconnected AI clips: it puts your attention back on shots and story. Import the ComfyUI workflows you already use, browse results, pick the best takes, then cut on the timeline and keep processing clips.
+HitVgo is a generative-AI timeline visual video editor. AI clips today are often fragmented and disconnected; HitVgo puts your attention back on shots and story. Import the ComfyUI workflows you already use, browse results, pick the best takes, then cut on the timeline and keep processing clips.
 
-This repo is the **standalone open-source build**: connect your own RunningHub or ComfyUI, auto-bind parameters with an LLM; all API keys stay on your machine. No login, no admin, no cloud storage quota.
+This repo is the **standalone open-source build**: connect your own RunningHub or ComfyUI, auto-bind parameters with an LLM; all API keys stay on your machine and never go through a third party. No login, no sign-up, no admin panel, no cloud storage quota.
 
-For day-to-day work, we recommend the official platform at [https://hitvgo.geek007.com](https://hitvgo.geek007.com): professionally tuned features and a fuller editor, plus multi-user, cloud assets, and platform channels. Open `http://127.0.0.1:5000` after:
+For day-to-day work, we recommend the official platform at [https://hitvgo.geek007.com](https://hitvgo.geek007.com): professionally tuned features and a fuller editor, plus multi-user support, a cloud asset library, and platform channels.
+
+License: [GNU Affero GPL v3.0](LICENSE) (or later).
+
+### Run locally
+
+Python 3.10+ is required.
 
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
 
-Use the [local agent](local_agent/README.md) for custom RunningHub / ComfyUI / LLM. Licensed under AGPL-3.0-or-later.
+On Windows you can also double-click `start.bat`. Then open `http://127.0.0.1:5000` in a browser.
+
+- Video runs through **custom RunningHub** (your own RH API key) or **local ComfyUI**. In Settings, upload a workflow and let the LLM detect and bind parameters.
+- Language models use **custom (local)** routing via the [local agent](local_agent/README.md), so keys never leave your machine.
+- The asset library is local only (via the local agent) plus scripts; there is no cloud asset space.
+
+Optional environment variables are listed in `.env.example`.
+
+### Local agent (RunningHub / ComfyUI / LLM)
+
+Run custom jobs on your machine and avoid browser CORS issues: see [local_agent/README.md](local_agent/README.md).
+
+```bash
+cd local_agent
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python app.py
+```
+
+Default listen address: `0.0.0.0:39281` (locally `http://127.0.0.1:39281`). Then go back to Settings in the web UI and test the connection.

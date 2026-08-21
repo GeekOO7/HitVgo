@@ -40,3 +40,48 @@ python -m venv .venv
 | POST | `/v1/llm/chat` | OpenAI 兼容转发 |
 
 默认绑定全部网卡，防火墙需放行端口。公网暴露时请自行限制来源或加反向代理鉴权，助手接口本身无登录。仅本机使用请设 `VFLOW_AGENT_HOST=127.0.0.1`。
+
+---
+
+## English
+
+> Author: **Geek007** · Repo: [GeekOO7/HitVgo](https://github.com/GeekOO7/HitVgo)
+
+Runs on your computer. The HitVgo web UI hands custom RunningHub / ComfyUI / LLM jobs to this agent so they execute locally and **avoid browser CORS**.
+
+### Quick start (Windows)
+
+1. Unzip this folder
+2. Double-click `start.bat` (first run creates a venv and installs dependencies)
+3. When you see “ready, go back to the web UI and test the connection”, open HitVgo Settings and click **Test connection**
+
+Default listen address: all interfaces `0.0.0.0:39281` (locally `http://127.0.0.1:39281`; on LAN/WAN use this machine’s IP or hostname). For localhost-only access set `VFLOW_AGENT_HOST=127.0.0.1`.
+
+### Manual start
+
+```bash
+cd local_agent
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python app.py
+```
+
+Optional environment variables:
+
+- `VFLOW_AGENT_HOST` (default `0.0.0.0`, all interfaces; use `127.0.0.1` for localhost only)
+- `VFLOW_AGENT_PORT` (default `39281`)
+
+Config file: `~/.vflow-agent/config.json` (can also be synced when you click Save in the web UI).
+
+### API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| GET/PUT | `/config` | Read/write local config |
+| POST | `/v1/video/run` | multipart: `meta` + assets; blocks until done (legacy clients) |
+| POST | `/v1/video/create` | same assets; returns `{ taskId }` immediately, does not persist the result |
+| POST | `/v1/video/poll` | JSON: `channel` + `taskId`; in-progress returns status JSON, success returns video bytes |
+| POST | `/v1/llm/chat` | OpenAI-compatible proxy |
+
+Binds all interfaces by default; open the port in the firewall. If you expose it to the public internet, restrict sources yourself or put auth on a reverse proxy — the agent has no login. For local-only use, set `VFLOW_AGENT_HOST=127.0.0.1`.
