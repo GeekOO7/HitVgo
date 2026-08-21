@@ -683,21 +683,18 @@ def main() -> None:
         if host in ("0.0.0.0", "::")
         else f"http://{host}:{port}"
     )
-    banner = (
-        "\n"
-        "========================================\n"
-        f"  HitVgo 本机助手 v{VERSION}\n"
-        "  作者: Geek007\n"
-        "  https://hitvgo.geek007.com\n"
-        "----------------------------------------\n"
-        f"  监听: {bind_hint}\n"
-        f"  本机检测: http://127.0.0.1:{port}\n"
-        "  已就绪，请回到网页点击「检测连接」\n"
-        f"  配置: {CONFIG_PATH}\n"
-        "  保持本窗口开启；关闭即停止助手\n"
-        "========================================\n"
+    from banner import print_startup_banner
+
+    print_startup_banner(
+        [
+            f"本机助手  v{VERSION}",
+            f"监听      {bind_hint}",
+            f"本机检测  http://127.0.0.1:{port}",
+            "已就绪，请回到网页点击「检测连接」",
+            f"配置      {CONFIG_PATH}",
+            "保持本窗口开启；关闭即停止助手",
+        ]
     )
-    print(banner, flush=True)
     # threaded=True so long video jobs don't block health checks
     app.run(host=host, port=port, threaded=True, use_reloader=False)
 

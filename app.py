@@ -4084,4 +4084,13 @@ app.wsgi_app = _IgnoreClientDisconnectMiddleware(app.wsgi_app)
 
 
 if __name__ == "__main__":
+    import banner as _banner
+
+    if _banner.should_print_banner(debug=bool(config.DEBUG)):
+        _banner.print_startup_banner(
+            [
+                "本机地址  http://127.0.0.1:5000",
+                "监听      http://0.0.0.0:5000",
+            ]
+        )
     app.run(host="0.0.0.0", port=5000, debug=config.DEBUG)

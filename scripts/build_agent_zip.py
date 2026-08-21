@@ -10,6 +10,7 @@ OUT = OUT_DIR / "vflow-local-agent.zip"
 
 INCLUDE = {
     "app.py",
+    "banner.py",
     "runners.py",
     "duck_decode.py",
     "requirements.txt",
