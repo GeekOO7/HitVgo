@@ -90,7 +90,7 @@
               <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp,image/jpg" hidden />
             </label>
             <button type="button" id="btnPickSharedFromLibrary" class="btn btn-ghost btn-sm" data-i18n="bins.pickFromLibrary">从素材库选用</button>
-            <button type="button" id="btnGoFirstFrameGen" class="btn btn-ghost btn-sm" data-i18n="bins.goGenerate">去生成</button>
+            <button type="button" id="btnGoFirstFrameGen" class="btn btn-storyboard btn-sm" data-i18n="bins.goGenerate">生成首帧图</button>
           </div>
           <span id="imageName" class="muted bin-filename" data-i18n="bins.notSelected">未选择</span>
           <div id="dropZone" class="drop-zone">
@@ -254,7 +254,7 @@
           <video id="playlistVideo" class="preview-video is-active" playsinline preload="auto"></video>
           <video id="playlistVideoB" class="preview-video" playsinline preload="auto"></video>
           <img id="playlistImage" class="playlist-image hidden" alt="" />
-          <div id="previewEmpty" class="preview-empty">
+          <div id="previewEmpty" class="preview-empty hidden">
             <p data-i18n="preview.title">中央预览</p>
             <p class="muted" data-i18n="preview.hint">在底部时间轴点选片段</p>
           </div>
@@ -266,7 +266,7 @@
             <button type="button" id="btnApplyAsset" class="btn btn-primary btn-sm" data-i18n="bins.applyToSlot">选用到当前槽</button>
           </div>
         </div>
-        <div id="firstFrameGenBar" class="first-frame-gen-bar">
+        <div id="firstFrameGenBar" class="first-frame-gen-bar hidden">
           <div class="first-frame-gen-head">
             <strong data-i18n="firstFrame.genTitle">首帧生成</strong>
             <span id="firstFrameSizeHint" class="muted first-frame-size-hint"></span>
@@ -390,6 +390,7 @@
           <button type="button" id="btnTlZoomOut" class="btn btn-ghost btn-sm" data-i18n-title="timeline.zoomOut" title="缩小">−</button>
           <button type="button" id="btnTlZoomIn" class="btn btn-ghost btn-sm" data-i18n-title="timeline.zoomIn" title="放大">＋</button>
           <button type="button" id="btnTlFit" class="btn btn-ghost btn-sm" data-i18n="timeline.fit" data-i18n-title="timeline.fitTitle" title="适配宽度">适配</button>
+          <button type="button" id="btnTlSplit" class="btn btn-ghost btn-sm" data-i18n-title="timeline.splitAtPlayheadShortcut" data-i18n-aria-label="timeline.splitAtPlayhead" title="在播放头断开 (S)" aria-label="在播放头断开">✂</button>
           <span id="tlZoomLabel" class="muted tl-zoom-label">40px/s</span>
           <button type="button" id="btnTlAddVideoTrack" class="btn btn-ghost btn-sm" data-i18n="timeline.addVideoTrack" data-i18n-title="timeline.addVideoTrackTitle" title="新增视频层">＋视频层</button>
           <button type="button" id="btnTlAddAudioTrack" class="btn btn-ghost btn-sm" data-i18n="timeline.addAudioTrack" data-i18n-title="timeline.addAudioTrackTitle" title="新增音轨层">＋音轨</button>

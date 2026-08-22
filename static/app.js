@@ -1035,6 +1035,7 @@
   const btnTlZoomIn = document.getElementById("btnTlZoomIn");
   const btnTlZoomOut = document.getElementById("btnTlZoomOut");
   const btnTlFit = document.getElementById("btnTlFit");
+  const btnTlSplit = document.getElementById("btnTlSplit");
   const btnTlAddVideoTrack = document.getElementById("btnTlAddVideoTrack");
   const btnTlAddAudioTrack = document.getElementById("btnTlAddAudioTrack");
   const concurrencyEl = document.getElementById("concurrency");
@@ -7131,7 +7132,8 @@
     } else {
       setGapBlackPreview(false);
       playlistPanel.classList.remove("has-source");
-      if (previewEmpty) previewEmpty.classList.remove("hidden");
+      // Empty player: black viewport, no "中央预览" hint overlay.
+      if (previewEmpty) previewEmpty.classList.add("hidden");
       playlistVideo.removeAttribute("src");
       previewLoadedUrl = null;
       if (load) playlistVideo.load();
@@ -10570,7 +10572,10 @@
       renderSelectionUI();
     }
 
-    const seekTo = Math.max(0, item.srcIn + offset);
+    // Paused at exact 0 often leaves browsers with a black undrawn frame;
+    // nudge slightly so the first frame paints (same as selectAndPreviewClip).
+    let seekTo = Math.max(0, item.srcIn + offset);
+    if (!autoPlay && seekTo === 0) seekTo = 0.04;
     if (autoPlay) warmAudioMixForPlayback(playheadSec);
     previewSourceAt(item.playUrl, seekTo, item.prompt, !!autoPlay, {
       driveTimeline: !!autoPlay,
@@ -10586,7 +10591,7 @@
       stopTimelinePlayback();
       scheduleIndex = -1;
       setGapBlackPreview(false);
-      setPreviewSource(null, t("preview.noVideoLayer"), { load: true });
+      setPreviewSource(null, "", { load: true });
       updatePlaylistMeta();
       return;
     }
@@ -13798,23 +13803,14 @@
   }
 
   /**
-   * After load/refresh: if any slot already has video, open video preview
-   * instead of leaving the first-frame generator visible in the center.
+   * After load/refresh: pause at playhead on the timeline (do not autoplay).
+   * With video at t=0 show that frame; otherwise leave a black empty player.
+   * First-frame generator stays hidden until the user opens it from the bin.
    */
   function previewFilledSlotAfterLoad() {
-    const filled = listClipsChronological().filter((c) => c.playUrl);
-    if (!filled.length) {
-      syncFirstFrameGenBar();
-      return;
-    }
-    let target = null;
-    if (selectedClip) {
-      target = filled.find(
-        (c) => c.kind === selectedClip.kind && c.id === selectedClip.id
-      );
-    }
-    if (!target) target = filled[0];
-    selectAndPreviewClip(target.kind, target.id, false);
+    if (firstFrameGenBar) firstFrameGenBar.classList.add("hidden");
+    seekPlayhead(playheadSec, false);
+    syncFirstFrameGenBar();
   }
 
   /** Convert legacy adjacent main/bridge order into sequential placement on one track. */
@@ -13921,6 +13917,9 @@
       } catch (_) {}
     });
     if (playlistVideoA) setActivePreviewVideo(playlistVideoA);
+    if (playlistPanel) playlistPanel.classList.remove("has-source");
+    if (previewEmpty) previewEmpty.classList.add("hidden");
+    if (firstFrameGenBar) firstFrameGenBar.classList.add("hidden");
     globalStatus.textContent = "";
     suppressSave = false;
     renderAll();
@@ -14721,12 +14720,12 @@
 
   function syncFirstFrameGenBar() {
     if (!firstFrameGenBar) return;
-    // Hide while a non-image clip is actively previewed as video.
+    // Video preview must hide the generator; empty/image never auto-opens it.
     const showingVideo =
       playlistPanel &&
       playlistPanel.classList.contains("has-source") &&
       !playlistPanel.classList.contains("is-image-preview");
-    firstFrameGenBar.classList.toggle("hidden", !!showingVideo);
+    if (showingVideo) firstFrameGenBar.classList.add("hidden");
     updateFirstFrameSizeHint();
   }
 
@@ -21001,6 +21000,14 @@
   }
   if (btnTlFit) {
     btnTlFit.addEventListener("click", () => fitTimelineZoom());
+  }
+  if (btnTlSplit) {
+    btnTlSplit.addEventListener("click", () => {
+      if (!selectedClip) return;
+      if (!splitClipAtPlayhead(selectedClip.kind, selectedClip.id)) {
+        alert(t("timeline.splitDisabled"));
+      }
+    });
   }
   if (btnTlAddVideoTrack) {
     btnTlAddVideoTrack.addEventListener("click", () => addVideoTrack());
